@@ -1,3 +1,4 @@
+
 if OS_NAME == :Linux
     shlib_ext = "so"
 elseif OS_NAME == :Darwin 
@@ -22,7 +23,7 @@ function download_cmd(url::String, filename::String)
     global downloadcmd
     if downloadcmd === nothing
         for checkcmd in (:curl, :wget, :fetch)
-            if system("which $checkcmd > /dev/null") == 0
+            if success(`$checkcmd --help`)
                 downloadcmd = checkcmd
                 break
             end
@@ -39,6 +40,7 @@ function download_cmd(url::String, filename::String)
     end
 end
 
+@unix_only begin
 function unpack_cmd(file,directory)
     path,extension = splitext(file)
     secondary_extension = splitext(path)[2]
@@ -49,12 +51,25 @@ function unpack_cmd(file,directory)
     end
     error("I don't know how to unpack $file")
 end
+end
+
+@windows_only begin
+function unpack_cmd(file,directory)
+    path,extension = splitext(file)
+    secondary_extension = splitext(path)[2]
+    if((extension == ".gz" || extension == ".xz") && secondary_extension == ".tar")
+        return (`7z x $file -y -so`|`7z x -si -y -ttar -o$directory`)
+    end
+    error("I don't know how to unpack $file")
+end	
+end
 
 type SynchronousStepCollection
     steps::Vector{Any}
     cwd::String
     oldcwd::String
     SynchronousStepCollection(cwd) = new({},cwd,cwd)
+	SynchronousStepCollection() = new({},"","")
 end
 
 import Base.push!, Base.run, Base.(|)
@@ -81,6 +96,15 @@ type FileUnpacker <: BuildStep
     dest::String    #directory
 end
 
+type MakeTargets <: BuildStep
+	dir::String
+	targets::Vector{ASCIIString}
+	MakeTargets(dir,target) = new(dir,target)
+	MakeTargets(target::Vector{ASCIIString}) = new("",target)
+	MakeTargets(target::ASCIIString) = new("",[target])
+	MakeTargets() = new("",[""])
+end
+
 type AutotoolsDependency <: BuildStep
     src::String     #src direcory
     prefix::String
@@ -88,13 +112,9 @@ type AutotoolsDependency <: BuildStep
     configure_options::Vector{String}
     libname::String
     installed_libname::String
-    AutotoolsDependency(a::String,b::String,c::String,d::Vector{String},e::String,f::String) = new(a,b,c,d,e,f)
-    AutotoolsDependency(b::String,c::String,d::Vector{String},e::String,f::String) = new("",b,c,d,e,f)
-end
-
-type FileRule <: BuildStep
-    file::String
-    step
+	config_status_dir::String
+    AutotoolsDependency(a::String,b::String,c::String,d::Vector{String},e::String,f::String,g::String) = new(a,b,c,d,e,f,g)
+    AutotoolsDependency(b::String,c::String,d::Vector{String},e::String,f::String) = new("",b,c,d,e,f,"")
 end
 
 type DirectoryRule <: BuildStep
@@ -147,11 +167,13 @@ macro dependent_steps(steps)
     blk
 end
 
+mypwd() = chomp(readall(`pwd`))
+
 macro build_steps(steps)
     collection = gensym()
     blk = expr(:block)
     push!(blk.args,quote
-        $(esc(collection)) = SynchronousStepCollection(pwd())
+        $(esc(collection)) = SynchronousStepCollection()
     end)
     meta_lower(steps,blk,collection)
     push!(blk.args, quote; $(esc(collection)); end)
@@ -161,10 +183,25 @@ end
 src(b::BuildStep) = b.src
 dest(b::BuildStep) = b.dest
 
-(|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection(pwd())
-(|)(b::SynchronousStepCollection,a::SynchronousStepCollection) = (append(a.steps,b.steps); a)
+(|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
+function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection) 
+	if(a.cwd==b.cwd)
+		append!(a.steps,b.steps)
+	else
+		push!(a.steps,b)
+	end
+	a
+end
 (|)(a::SynchronousStepCollection,b) = push!(a.steps,b)
 (|)(b,a::SynchronousStepCollection) = unshift!(a.steps,b)
+
+type FileRule <: BuildStep
+    file::String
+    step
+	function FileRule(file,step) 
+		f=new(file,@build_steps (step,) )
+	end
+end
 
 function lower(s::ChangeDirectory,collection)
     if(!isempty(collection.steps))
@@ -172,55 +209,105 @@ function lower(s::ChangeDirectory,collection)
     end
     collection.cwd = s.dir
 end
+lower(s::Nothing,collection) = nothing
+lower(s::Function,collection) = push!(collection,s)
+lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->mkpath(s.dest)), )
 lower(s::BuildStep,collection) = push!(collection,s)
 lower(s::Base.AbstractCmd,collection) = push!(collection,s)
-lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), FileRule(s.dest,download_cmd(s.src,s.dest)) )
-lower(s::FileUnpacker,collection) = @dependent_steps ( CreateDirectory(s.dest,true), unpack_cmd(s.src,s.dest) )
+lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
+lower(s::FileUnpacker,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), DirectoryRule(s.dest,unpack_cmd(s.src,dirname(s.dest))) )
+@unix_only lower(a::MakeTargets,collection) = @dependent_steps ( `make -j8 $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
+@windows_only lower(a::MakeTargets,collection) = @dependent_steps ( `make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
+lower(s::SynchronousStepCollection,collection) = (s|collection)
+
+#run(s::MakeTargets) = run(@make_steps (s,))
+
 function lower(s::AutotoolsDependency,collection)
-    @dependent_steps begin
+	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
+	@unix_only prefix = s.prefix
+	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
+	info(cmdstring)
+    @unix_only @dependent_steps begin
         CreateDirectory(s.builddir)
         `echo test`
         begin
             ChangeDirectory(s.builddir)
-            FileRule("config.status", `$(s.src)/configure $(s.configure_options) --prefix=$(s.prefix)`)
-            FileRule(s.libname,make_command)
-            FileRule(s.installed_libname,`$make_command install`)
+			()->println(s.src)
+            @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), `$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`)
+            FileRule(s.libname,MakeTargets())
+            FileRule(s.installed_libname,MakeTargets("install"))
         end
     end
+	@windows_only @dependent_steps begin
+		begin
+            ChangeDirectory(s.src)
+			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),`sh -c $cmdstring`)
+            FileRule(s.libname,MakeTargets())
+            FileRule(s.installed_libname,MakeTargets("install"))
+        end
+	end
+end
+
+function run(f::Function)
+	f()
 end
 
 function run(s::FileRule)
     if(!isfile(s.file))
         run(s.step)
+		if(!isfile(s.file))
+			error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
+		end
+    end
+end
+function run(s::DirectoryRule)
+	info("Attempting to Create directory $(s.dir)")
+    if(!isdir(s.dir))
+        run(s.step)
+		if(!isdir(s.dir))
+			error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
+		end
+	else
+		info("Directory $(s.dir) already created")
     end
 end
 function run(s::BuildStep)
     error("Unimplemented BuildStep: $(typeof(s))")
 end
-function run(s::CreateDirectory)
-    @make_rule isdir(s.dest) run(`mkdir -p $(s.dest)`)
-end
 function run(s::SynchronousStepCollection)
     for x in s.steps
-        cd(s.cwd)
+		if(!isempty(s.cwd))
+			info("Changing Directory to $(s.cwd)")
+			cd(s.cwd)
+		end
         run(x)
-        cd(s.oldcwd)
+        if(!isempty(s.oldcwd))
+			info("Changing Directory to $(s.oldcwd)")
+			cd(s.oldcwd)
+		end
     end
 end
 
 @unix_only make_command = `make -j8`
 @windows_only make_command = `make`
 
-function autotools_install(url, downloaded_file, configure_opts, directory, libname, installed_libname)
+function prepare_src(url, downloaded_file, directory_name)
+    local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
+	@build_steps begin
+        FileDownloader(url,local_file)
+        FileUnpacker(local_file,joinpath(depsdir,"src",directory_name))
+	end
+end
+
+function autotools_install(url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, confstatusdir)
     prefix = joinpath(depsdir,"usr")
     libdir = joinpath(prefix,"lib")
     srcdir = joinpath(depsdir,"src",directory)
-    local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
     dir = joinpath(joinpath(depsdir,"builds"),directory)
-    run(@build_steps begin
-        FileDownloader(url,local_file)
-        FileUnpacker(local_file,joinpath(depsdir,"src"))
-        AutotoolsDependency(srcdir,prefix,dir,configure_opts,libname,joinpath(libdir,installed_libname))
+    run(prepare_src(url, downloaded_file,directory_name))
+	run(@build_steps begin
+        AutotoolsDependency(srcdir,prefix,dir,configure_opts,libname,joinpath(libdir,installed_libname),confstatusdir)
     end)
 end
-autotools_install(url, downloaded_file, configure_opts, directory, libname)=autotools_install(url,downloaded_file,configure_opts,directory,libname,libname)
+autotools_install(url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname) = autotools_install(url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, "")
+autotools_install(url, downloaded_file, configure_opts, directory, libname)=autotools_install(url,downloaded_file,configure_opts,directory,directory,libname,libname)
