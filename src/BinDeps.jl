@@ -102,7 +102,7 @@ type MakeTargets <: BuildStep
 	MakeTargets(dir,target) = new(dir,target)
 	MakeTargets(target::Vector{ASCIIString}) = new("",target)
 	MakeTargets(target::ASCIIString) = new("",[target])
-	MakeTargets() = new("",[""])
+	MakeTargets() = new("",ASCIIString[])
 end
 
 type AutotoolsDependency <: BuildStep
@@ -116,6 +116,88 @@ type AutotoolsDependency <: BuildStep
     AutotoolsDependency(a::String,b::String,c::String,d::Vector{String},e::String,f::String,g::String) = new(a,b,c,d,e,f,g)
     AutotoolsDependency(b::String,c::String,d::Vector{String},e::String,f::String) = new("",b,c,d,e,f,"")
 end
+
+### Choices
+
+type Choice
+    name::Symbol
+    description::String
+    step::SynchronousStepCollection
+    Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
+end 
+
+type Choices <: BuildStep
+    choices::Vector{Choice}
+    Choices() = new(Array(Choice,0))
+    Choices(choices::Vector{Choice}) = new(choices)
+end
+
+push!(c::Choices, args...) = push!(c.choices, args...)
+
+function run(c::Choices)
+    info("There are multiple options available for installing this dependency:")
+    for x in c.choices
+        println("- "*string(x.name)*": "*x.description)
+    end
+    while true
+        print("Plese select desired method: ")
+        method = symbol(chomp(readline(STDIN)))
+        for x in c.choices
+            if(method == x.name)
+                return run(x.step)
+            end
+        end
+        warn("Invalid Method")
+    end
+end
+
+###
+
+@osx_only begin
+
+const installed_homebrew_packages = Set{ASCIIString}()
+
+function cacheHomebrewPackages()
+    empty!(installed_homebrew_packages)
+    for pkg in EachLine(read_from(`brew list`)[1])
+        add!(installed_homebrew_packages,chomp(pkg))
+    end
+    installed_homebrew_packages
+end
+
+type HomebrewInstall <: BuildStep
+    name::ASCIIString
+    desired_options::Vector{ASCIIString}
+    required_options::Vector{ASCIIString}
+    HomebrewInstall(name,desired_options) = new(name,desired_options,ASCIIString[])
+    HomebrewInstall(name,desired_options,required_options) = error("required_options not implemented yet")
+end
+
+function run(x::HomebrewInstall)
+    if(isempty(installed_homebrew_packages))
+        cacheHomebrewPackages()
+    end
+    if(has(installed_homebrew_packages,x.name))
+        info("Package already installed")
+    else
+        run(`brew install $(x.desired_options) $(x.name)`)
+    end
+    cacheHomebrewPackages()
+end
+
+end
+
+##
+
+type CCompile <: BuildStep
+    srcFile::String
+    destFile::String
+    options::Vector{ASCIIString}
+    libs::Vector{ASCIIString}
+end
+
+lower(cc::CCompile,c) = lower(`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`,c)
+##
 
 type DirectoryRule <: BuildStep
     dir::String
@@ -192,8 +274,11 @@ function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
 	end
 	a
 end
-(|)(a::SynchronousStepCollection,b) = push!(a.steps,b)
-(|)(b,a::SynchronousStepCollection) = unshift!(a.steps,b)
+(|)(a::SynchronousStepCollection,b::Function) = (lower(b,a);a)
+(|)(a::SynchronousStepCollection,b) = (lower(b,a);a)
+
+(|)(b::Function,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
+(|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
 type FileRule <: BuildStep
     file::String
@@ -211,14 +296,23 @@ function lower(s::ChangeDirectory,collection)
 end
 lower(s::Nothing,collection) = nothing
 lower(s::Function,collection) = push!(collection,s)
-lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->mkpath(s.dest)), )
+lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(println(s.dest);mkpath(s.dest))), )
 lower(s::BuildStep,collection) = push!(collection,s)
 lower(s::Base.AbstractCmd,collection) = push!(collection,s)
 lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
 lower(s::FileUnpacker,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), DirectoryRule(s.dest,unpack_cmd(s.src,dirname(s.dest))) )
-@unix_only lower(a::MakeTargets,collection) = @dependent_steps ( `make -j8 $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
+@unix_only function lower(a::MakeTargets,collection) 
+    cmd = `make -j8`
+    if(!isempty(a.dir))
+        cmd = `$cmd -C $(a.dir)`
+    end
+    if(!isempty(a.targets))
+        cmd = `$cmd $(a.targets)`
+    end
+    @dependent_steps ( cmd, )
+end
 @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( `make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
-lower(s::SynchronousStepCollection,collection) = (s|collection)
+lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
 #run(s::MakeTargets) = run(@make_steps (s,))
 
@@ -226,7 +320,6 @@ function lower(s::AutotoolsDependency,collection)
 	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
 	@unix_only prefix = s.prefix
 	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
-	info(cmdstring)
     @unix_only @dependent_steps begin
         CreateDirectory(s.builddir)
         `echo test`
@@ -304,10 +397,10 @@ function autotools_install(url, downloaded_file, configure_opts, directory_name,
     libdir = joinpath(prefix,"lib")
     srcdir = joinpath(depsdir,"src",directory)
     dir = joinpath(joinpath(depsdir,"builds"),directory)
-    run(prepare_src(url, downloaded_file,directory_name))
-	run(@build_steps begin
+    prepare_src(url, downloaded_file,directory_name) |
+	@build_steps begin
         AutotoolsDependency(srcdir,prefix,dir,configure_opts,libname,joinpath(libdir,installed_libname),confstatusdir)
-    end)
+    end
 end
 autotools_install(url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname) = autotools_install(url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, "")
 autotools_install(url, downloaded_file, configure_opts, directory, libname)=autotools_install(url,downloaded_file,configure_opts,directory,directory,libname,libname)
