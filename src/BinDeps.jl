@@ -1,4 +1,3 @@
-
 if OS_NAME == :Linux
     shlib_ext = "so"
 elseif OS_NAME == :Darwin 
@@ -159,7 +158,7 @@ const installed_homebrew_packages = Set{ASCIIString}()
 
 function cacheHomebrewPackages()
     empty!(installed_homebrew_packages)
-    for pkg in EachLine(read_from(`brew list`)[1])
+    for pkg in EachLine(readsfrom(`brew list`)[1])
         add!(installed_homebrew_packages,chomp(pkg))
     end
     installed_homebrew_packages
