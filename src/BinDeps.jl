@@ -196,7 +196,7 @@ type CCompile <: BuildStep
     libs::Vector{ASCIIString}
 end
 
-lower(cc::CCompile,c) = lower(`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`,c)
+lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
 ##
 
 type DirectoryRule <: BuildStep
