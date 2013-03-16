@@ -61,7 +61,7 @@ function unpack_cmd(file,directory)
     path,extension = splitext(file)
     secondary_extension = splitext(path)[2]
     if((extension == ".gz" || extension == ".xz" || extension == ".bz2") && secondary_extension == ".tar") ||
-           extension == ".tgz" || extension == ".tgz"
+           extension == ".tgz" || extension == ".tbz"
         return (`7z x $file -y -so`|`7z x -si -y -ttar -o$directory`)
     elseif extension == ".zip"
         return (`7z x $file -y -o$directory`)
