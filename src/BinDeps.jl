@@ -43,10 +43,14 @@ end
 function unpack_cmd(file,directory)
     path,extension = splitext(file)
     secondary_extension = splitext(path)[2]
-    if(extension == ".gz" && secondary_extension == ".tar")
+    if(extension == ".gz" && secondary_extension == ".tar") || extension == ".tgz"
         return (`tar xzf $file --directory=$directory`)
+    elseif(extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
+        return (`tar xjf $file --directory=$directory`)
     elseif(extension == ".xz" && secondary_extension == ".tar")
         return (`unxz -c $file `|`tar xv --directory=$directory`)
+    elseif(extension == ".zip")
+        return (`unzip -x $file -d $directory`)
     end
     error("I don't know how to unpack $file")
 end
@@ -56,8 +60,11 @@ end
 function unpack_cmd(file,directory)
     path,extension = splitext(file)
     secondary_extension = splitext(path)[2]
-    if((extension == ".gz" || extension == ".xz") && secondary_extension == ".tar")
+    if((extension == ".gz" || extension == ".xz" || extension == ".bz2") && secondary_extension == ".tar") ||
+           extension == ".tgz" || extension == ".tbz"
         return (`7z x $file -y -so`|`7z x -si -y -ttar -o$directory`)
+    elseif extension == ".zip"
+        return (`7z x $file -y -o$directory`)
     end
     error("I don't know how to unpack $file")
 end	
@@ -301,7 +308,7 @@ lower(s::Base.AbstractCmd,collection) = push!(collection,s)
 lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
 lower(s::FileUnpacker,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), DirectoryRule(s.dest,unpack_cmd(s.src,dirname(s.dest))) )
 @unix_only function lower(a::MakeTargets,collection) 
-    cmd = `make -j8`
+    cmd = `make -j$(CPU_CORES)`
     if(!isempty(a.dir))
         cmd = `$cmd -C $(a.dir)`
     end
@@ -380,7 +387,7 @@ function run(s::SynchronousStepCollection)
     end
 end
 
-@unix_only make_command = `make -j8`
+@unix_only make_command = `make -j$(CPU_CORES)`
 @windows_only make_command = `make`
 
 function prepare_src(url, downloaded_file, directory_name)
