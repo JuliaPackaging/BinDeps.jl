@@ -250,7 +250,7 @@ function meta_lower(a,blk::Expr,collection)
 end
 
 macro dependent_steps(steps)
-    blk = expr(:block)
+    blk = Expr(:block)
     meta_lower(steps,blk,:collection)
     blk
 end
@@ -259,7 +259,7 @@ mypwd() = chomp(readall(`pwd`))
 
 macro build_steps(steps)
     collection = gensym()
-    blk = expr(:block)
+    blk = Expr(:block)
     push!(blk.args,quote
         $(esc(collection)) = SynchronousStepCollection()
     end)
