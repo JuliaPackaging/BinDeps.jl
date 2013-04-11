@@ -1,7 +1,8 @@
 module BinDeps
     import Base.run 
     export @make_run, @build_steps, download_cmd, unpack_cmd, HomebrewInstall, Choice, Choices, CCompile, FileDownloader, 
-            FileRule, ChangeDirectory, FileDownloader, FileUnpacker, prepare_src, autotools_install, CreateDirectory
+            FileRule, ChangeDirectory, FileDownloader, FileUnpacker, prepare_src, autotools_install, CreateDirectory,
+            MakeTargets
 
     if OS_NAME == :Linux
         shlib_ext = "so"
