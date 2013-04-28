@@ -148,10 +148,8 @@ module BinDeps
     push!(c::Choices, args...) = push!(c.choices, args...)
 
     function run(c::Choices)
+        println()
         info("There are multiple options available for installing this dependency:")
-        for x in c.choices
-            println("- "*string(x.name)*": "*x.description)
-        end
         while true
             for x in c.choices
                 println("- "*string(x.name)*": "*x.description)
