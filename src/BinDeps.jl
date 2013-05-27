@@ -1,8 +1,11 @@
 module BinDeps
     import Base.run 
-    export @make_run, @build_steps, download_cmd, unpack_cmd, HomebrewInstall, Choice, Choices, CCompile, FileDownloader, 
-            FileRule, ChangeDirectory, FileDownloader, FileUnpacker, prepare_src, autotools_install, CreateDirectory,
-            MakeTargets
+
+    export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
+            HomebrewInstall, Choice, Choices, CCompile,
+            FileDownloader, FileRule, ChangeDirectory, FileDownloader,
+            FileUnpacker, prepare_src, autotools_install,
+            CreateDirectory, MakeTargets
 
     if OS_NAME == :Linux
         shlib_ext = "so"
@@ -19,6 +22,20 @@ module BinDeps
                 @assert $(esc(condition))
             end
         end
+    end
+
+    function find_library(pkg,libname,filename)
+        try
+            dl = dlopen(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
+        catch
+            try
+                dl = dlopen(libname)
+                dlclose(dl)
+            catch
+                return false
+            end
+        end
+        return true
     end
 
     abstract BuildStep
