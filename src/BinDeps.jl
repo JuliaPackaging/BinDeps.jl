@@ -25,17 +25,16 @@ module BinDeps
     end
 
     function find_library(pkg,libname,filename)
-        try
-            dl = dlopen(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
-        catch
-            try
-                dl = dlopen(libname)
-                dlclose(dl)
-            catch
-                return false
-            end
+        dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
+        if dl == C_NULL
+            dl = dlopen_e(libname)
+            if dl == C_NULL; return false; end
         end
-        return true
+
+        if dl != C_NULL
+            dlclose(dl)
+            return true
+        end
     end
 
     abstract BuildStep
