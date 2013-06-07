@@ -26,14 +26,17 @@ module BinDeps
 
     function find_library(pkg,libname,filename)
         dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
-        if dl == C_NULL
+        if dl != C_NULL
+            ccall(:add_library_mapping,Int32,(Ptr{Uint8},Ptr{Uint8}),libname,dl)
+        else
             dl = dlopen_e(libname)
-            if dl == C_NULL; return false; end
         end
 
         if dl != C_NULL
             dlclose(dl)
             return true
+        else
+            return false
         end
     end
 
