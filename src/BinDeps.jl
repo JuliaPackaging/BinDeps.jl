@@ -27,7 +27,7 @@ module BinDeps
     function find_library(pkg,libname,filename)
         dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
         if dl != C_NULL
-            ccall(:add_library_mapping,Int32,(Ptr{Uint8},Ptr{Uint8}),libname,dl)
+            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
         else
             dl = dlopen_e(libname)
         end
