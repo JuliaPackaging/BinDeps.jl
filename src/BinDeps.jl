@@ -5,14 +5,17 @@ module BinDeps
             HomebrewInstall, Choice, Choices, CCompile,
             FileDownloader, FileRule, ChangeDirectory, FileDownloader,
             FileUnpacker, prepare_src, autotools_install,
-            CreateDirectory, MakeTargets
+            CreateDirectory, MakeTargets, SystemLibInstall
+    import Base.Sys.shlib_ext
 
-    if OS_NAME == :Linux
-        shlib_ext = "so"
-    elseif OS_NAME == :Darwin 
-        shlib_ext = "dylib"
-    elseif OS_NAME == :Windows
-        shlib_ext = "dll"
+    function find_library(pkg, libname, alt)
+        Base.warn_once("BinDeps.find_library is deprecated, use Sys.find_library instead."; depth=1)
+        lib = Sys.find_library([libname, alt...])
+        if lib == ""
+            return false
+        end
+        ccall(:add_library_mapping,Int32,(Ptr{Uint8},Ptr{Uint8}),libname,dlopen(lib))
+        return true
     end
 
     macro make_rule(condition,command)
@@ -22,20 +25,6 @@ module BinDeps
                 @assert $(esc(condition))
             end
         end
-    end
-
-    function find_library(pkg,libname,filename)
-        try
-            dl = dlopen(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
-        catch
-            try
-                dl = dlopen(libname)
-                dlclose(dl)
-            catch
-                return false
-            end
-        end
-        return true
     end
 
     abstract BuildStep
@@ -183,44 +172,6 @@ module BinDeps
             end
         end
     end
-
-    ###
-
-    @osx_only begin
-
-        const installed_homebrew_packages = Set{ASCIIString}()
-
-        function cacheHomebrewPackages()
-            empty!(installed_homebrew_packages)
-            for pkg in EachLine(read_from(`brew list`)[1])
-                add!(installed_homebrew_packages,chomp(pkg))
-            end
-            installed_homebrew_packages
-        end
-
-        type HomebrewInstall <: BuildStep
-            name::ASCIIString
-            desired_options::Vector{ASCIIString}
-            required_options::Vector{ASCIIString}
-            HomebrewInstall(name,desired_options) = new(name,desired_options,ASCIIString[])
-            HomebrewInstall(name,desired_options,required_options) = error("required_options not implemented yet")
-        end
-
-        function run(x::HomebrewInstall)
-            if(isempty(installed_homebrew_packages))
-                cacheHomebrewPackages()
-            end
-            if(has(installed_homebrew_packages,x.name))
-                info("Package already installed")
-            else
-                run(`brew install $(x.desired_options) $(x.name)`)
-            end
-            cacheHomebrewPackages()
-        end
-
-    end
-
-    ##
 
     type CCompile <: BuildStep
         srcFile::String
@@ -439,4 +390,5 @@ module BinDeps
     autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname) = autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, "")
     autotools_install(depsdir,url, downloaded_file, configure_opts, directory, libname)=autotools_install(depsdir,url,downloaded_file,configure_opts,directory,directory,libname,libname)
 
+    include("system.jl")
 end
