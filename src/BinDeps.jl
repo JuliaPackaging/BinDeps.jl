@@ -9,8 +9,8 @@ module BinDeps
     import Base.Sys.shlib_ext
 
     function find_library(pkg, libname, alt)
-        Base.warn_once("BinDeps.find_library is deprecated, use Sys.find_library instead."; depth=1)
-        lib = Sys.find_library([libname, alt...])
+        Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead."; depth=1)
+        lib = Base.find_library([libname, alt...])
         if lib == ""
             return false
         end
