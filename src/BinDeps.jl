@@ -1,5 +1,5 @@
 module BinDeps
-    import Base.run 
+    importall Base
 
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
             HomebrewInstall, Choice, Choices, CCompile,
@@ -24,20 +24,25 @@ module BinDeps
         end
     end
 
-    function find_library(pkg,libname,filename)
-        dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
-        if dl != C_NULL
-            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
-        else
-            dl = dlopen_e(libname)
+    function find_library(pkg,libname,files)
+        dl = C_NULL
+        for filename in files
+            dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
+            if dl != C_NULL
+                ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
+                return true
+            else
+                dl = dlopen_e(filename)
+                if dl != C_NULL
+                    ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
+                    return true
+                end
+            end
+                
         end
 
-        if dl != C_NULL
-            dlclose(dl)
-            return true
-        else
-            return false
-        end
+        dl = dlopen_e(libname)
+        dl != C_NULL ? true : false
     end
 
     abstract BuildStep
