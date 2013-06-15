@@ -31,14 +31,13 @@ module BinDeps
             if dl != C_NULL
                 ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
                 return true
-            else
-                dl = dlopen_e(filename)
-                if dl != C_NULL
-                    ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
-                    return true
-                end
             end
-                
+               
+            dl = dlopen_e(filename)
+            if dl != C_NULL
+                ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
+                return true
+            end                
         end
 
         dl = dlopen_e(libname)
