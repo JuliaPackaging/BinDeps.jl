@@ -71,18 +71,28 @@ library_dependency(args...; properties...) = error("No context provided. Did you
 
 abstract PackageManager <: DependencyProvider
 
+const has_homebrew = try success(`brew -v`) catch e false end
+
 type Homebrew <: PackageManager 
 	inst::HomebrewInstall
 end
 Homebrew(pkg::String) = Homebrew(HomebrewInstall(pkg,ASCIIString[]))
+can_use(::Type{Homebrew}) = has_homebrew && OS_NAME == :Darwin
 
+const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
 	package::String
 end
+can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
 
+const has_yum = try success(`yum -v`) catch e false end
 type Yum <: PackageManager
 	package::String
 end
+can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
+
+# Can use everything else without restriction by default
+can_use(::Type) = true
 
 abstract Sources <: DependencyHelper
 abstract Binaries <: DependencyProvider
@@ -146,7 +156,7 @@ function provides{T}(::Type{T},providers::Dict; opts...)
 end
 
 generate_steps(h::BuildProcess,dep::LibraryDependency) = h.steps
-generate_steps(h::Homebrew,dep::LibraryDependency) = h.install
+generate_steps(h::Homebrew,dep::LibraryDependency) = h.inst
 generate_steps(h::AptGet,dep::LibraryDependency) = `sudo apt-get install $(h.package)`
 generate_steps(h::Yum,dep::LibraryDependency) = `sudo yum install $(h.package)`
 function generate_steps(h::NetworkSource,dep::LibraryDependency) 
@@ -166,7 +176,7 @@ end
 
 function getprovider(dep::LibraryDependency,method)
 	for (p,opts) = dep.providers
-		if typeof(p) <: method
+		if typeof(p) <: method && can_use(typeof(p))
 			return (p,opts)
 		end
 	end
@@ -289,11 +299,19 @@ macro load_dependencies(args...)
 	dir = dirname(normpath(joinpath(dirname(Base.source_path()),"..")))
     arg1 = nothing
     file = "../deps/build.jl"
-    if length(args) == 1 && isa(args[1],Expr)
-    	arg1 = eval(args[1])
+    if length(args) == 1 
+		if isa(args[1],Expr)
+	    	    arg1 = eval(args[1])
+		elseif typeof(args[1]) <: String
+		    file = args[1]
+	    elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
+	    	arg1 = args[1]
+	    else
+	        error("Type $(typeof(args[1])) not recognized for argument 1. See usage instructions!")
+		end
     elseif length(args) == 2
     	file = args[1]
-    	arg1 = eval(args[2])
+    	arg1 = typeof(args[2]) <: Associative || isa(args[2],Vector) ? args[2] : eval(args[2])
     elseif length(args) != 0
     	error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
     end
