@@ -256,7 +256,7 @@ macro install()
 		for d in bindeps_context.deps
 			BinDeps.satisfy!(d)
 		end
-		Pkg2.markworking(bindeps_context.package)
+		isdefined(Pkg2,:markworking) && Pkg2.markworking(bindeps_context.package)
 	end)
 end
 
@@ -307,7 +307,7 @@ macro load_dependencies(args...)
 			pkg = dir[(last(r)+2):end]
 		end
 	end
-	if pkg != "" && !Pkg2.isworking(pkg)
+	if pkg != "" && isdefined(Pkg2,:isworking) && !Pkg2.isworking(pkg)
 		error("This package was marked as not working. Run Pkg2.fixup() to attempt to install any"*
 			  " missing dependencies. You may have to exit Julia afterwards.")
 	end
@@ -346,7 +346,7 @@ macro load_dependencies(args...)
 		end
 		s = symbol(sym)
 		errorcase = Expr(:block)
-		pkg != "" && push!(errorcase.args,:(Pkg2.markworking($pkg,false)))
+		pkg != "" && isdefined(Pkg2,:markworking) && push!(errorcase.args,:(Pkg2.markworking($pkg,false)))
 		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg2.fixup() to install missing dependencies!")))
 		push!(ret.args,quote
 			const $(esc(s)) = Base.find_library([$(dep.name),$(get(dep.properties,:aliases,ASCIIString[]))],[$(libdir(dep))])
