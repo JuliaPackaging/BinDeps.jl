@@ -5,26 +5,11 @@ module BinDeps
             HomebrewInstall, Choice, Choices, CCompile,
             FileDownloader, FileRule, ChangeDirectory, FileDownloader,
             FileUnpacker, prepare_src, autotools_install,
-            CreateDirectory, MakeTargets
-
-    if OS_NAME == :Linux
-        shlib_ext = "so"
-    elseif OS_NAME == :Darwin 
-        shlib_ext = "dylib"
-    elseif OS_NAME == :Windows
-        shlib_ext = "dll"
-    end
-
-    macro make_rule(condition,command)
-        quote
-            if(!$(esc(condition)))
-                $(esc(command))
-                @assert $(esc(condition))
-            end
-        end
-    end
+            CreateDirectory, MakeTargets, SystemLibInstall
+    import Base.Sys.shlib_ext
 
     function find_library(pkg,libname,files)
+        Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead."; depth=1)
         dl = C_NULL
         for filename in files
             dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
@@ -42,6 +27,15 @@ module BinDeps
 
         dl = dlopen_e(libname)
         dl != C_NULL ? true : false
+    end
+
+    macro make_rule(condition,command)
+        quote
+            if(!$(esc(condition)))
+                $(esc(command))
+                @assert $(esc(condition))
+            end
+        end
     end
 
     abstract BuildStep
@@ -69,15 +63,13 @@ module BinDeps
     end
 
     @unix_only begin
-        function unpack_cmd(file,directory)
-            path,extension = splitext(file)
-            secondary_extension = splitext(path)[2]
+        function unpack_cmd(file,directory,extension,secondary_extension)
             if(extension == ".gz" && secondary_extension == ".tar") || extension == ".tgz"
                 return (`tar xzf $file --directory=$directory`)
             elseif(extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
                 return (`tar xjf $file --directory=$directory`)
             elseif(extension == ".xz" && secondary_extension == ".tar")
-                return (`unxz -c $file `|`tar xv --directory=$directory`)
+                return (`unxz -c $file `|>`tar xv --directory=$directory`)
             elseif(extension == ".zip")
                 return (`unzip -x $file -d $directory`)
             end
@@ -86,12 +78,10 @@ module BinDeps
     end
 
     @windows_only begin
-        function unpack_cmd(file,directory)
-            path,extension = splitext(file)
-            secondary_extension = splitext(path)[2]
+        function unpack_cmd(file,directory,path,target)
             if((extension == ".gz" || extension == ".xz" || extension == ".bz2") && secondary_extension == ".tar") ||
                    extension == ".tgz" || extension == ".tbz"
-                return (`7z x $file -y -so`|`7z x -si -y -ttar -o$directory`)
+                return (`7z x $file -y -so`|>`7z x -si -y -ttar -o$directory`)
             elseif extension == ".zip"
                 return (`7z x $file -y -o$directory`)
             end
@@ -129,16 +119,18 @@ module BinDeps
     type FileUnpacker <: BuildStep
         src::String     #file
         dest::String    #directory
+        target::String  #file inside the archive to test for existence (or blank to check for a.tgz => a/)
     end
 
 
     type MakeTargets <: BuildStep
     	dir::String
     	targets::Vector{ASCIIString}
-    	MakeTargets(dir,target) = new(dir,target)
-    	MakeTargets(target::Vector{ASCIIString}) = new("",target)
-    	MakeTargets(target::ASCIIString) = new("",[target])
-    	MakeTargets() = new("",ASCIIString[])
+        env
+    	MakeTargets(dir,target;env = ByteString[]) = new(dir,target,env)
+    	MakeTargets(target::Vector{ASCIIString};env = ByteString[]) = new("",target,env)
+    	MakeTargets(target::ASCIIString;env = ByteString[]) = new("",[target],env)
+    	MakeTargets(;env = ByteString[]) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -146,11 +138,12 @@ module BinDeps
         prefix::String
         builddir::String
         configure_options::Vector{String}
-        libname::String
-        installed_libname::String
+        libtarget::String
+        installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
     	config_status_dir::String
-        AutotoolsDependency(a::String,b::String,c::String,d::Vector{String},e::String,f::String,g::String) = new(a,b,c,d,e,f,g)
-        AutotoolsDependency(b::String,c::String,d::Vector{String},e::String,f::String) = new("",b,c,d,e,f,"")
+        env
+        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = "", installed_libpath = ByteString[], config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+            new(srcdir,prefix,builddir,configure_options,libtarget,installed_libpath,config_status_dir,env)
     end
 
     ### Choices
@@ -189,44 +182,6 @@ module BinDeps
             end
         end
     end
-
-    ###
-
-    @osx_only begin
-
-        const installed_homebrew_packages = Set{ASCIIString}()
-
-        function cacheHomebrewPackages()
-            empty!(installed_homebrew_packages)
-            for pkg in EachLine(read_from(`brew list`)[1])
-                add!(installed_homebrew_packages,chomp(pkg))
-            end
-            installed_homebrew_packages
-        end
-
-        type HomebrewInstall <: BuildStep
-            name::ASCIIString
-            desired_options::Vector{ASCIIString}
-            required_options::Vector{ASCIIString}
-            HomebrewInstall(name,desired_options) = new(name,desired_options,ASCIIString[])
-            HomebrewInstall(name,desired_options,required_options) = error("required_options not implemented yet")
-        end
-
-        function run(x::HomebrewInstall)
-            if(isempty(installed_homebrew_packages))
-                cacheHomebrewPackages()
-            end
-            if(has(installed_homebrew_packages,x.name))
-                info("Package already installed")
-            else
-                run(`brew install $(x.desired_options) $(x.name)`)
-            end
-            cacheHomebrewPackages()
-        end
-
-    end
-
-    ##
 
     type CCompile <: BuildStep
         srcFile::String
@@ -319,11 +274,14 @@ module BinDeps
     (|)(b::Function,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
     (|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
+    # Create any of these files
     type FileRule <: BuildStep
-        file::String
+        file::Array{String}
         step
-    	function FileRule(file,step) 
-    		f=new(file,@build_steps (step,) )
+        FileRule(file::String,step) = FileRule(String[file],step)
+        FileRule{T<:String}(files::Vector{T},step) = FileRule(String[f for f in files],step)
+    	function FileRule(files::Vector{String},step) 
+    		f=new(files,@build_steps (step,) )
     	end
     end
 
@@ -339,7 +297,19 @@ module BinDeps
     lower(s::BuildStep,collection) = push!(collection,s)
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
     lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
-    lower(s::FileUnpacker,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), DirectoryRule(s.dest,unpack_cmd(s.src,dirname(s.dest))) )
+    function splittarpath(path) 
+        path,extension = splitext(path)
+        base_filename,secondary_extension = splitext(path)
+        (base_filename,extension,secondary_extension)
+    end
+    function lower(s::FileUnpacker,collection)
+        base_filename,extension,secondary_extension = splittarpath(s.src)
+        target = !isempty(s.target) ? s.target : basename(base_filename)
+        @dependent_steps begin
+            CreateDirectory(dirname(s.dest),true)
+            DirectoryRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
+        end
+    end
     @unix_only function lower(a::MakeTargets,collection) 
         cmd = `make -j8`
         if(!isempty(a.dir))
@@ -353,21 +323,24 @@ module BinDeps
     @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( `make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
+    lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
+
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
     	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
     	@unix_only prefix = s.prefix
     	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
+        env = similar(s.env)
+        merge!(env,ENV)
+        merge!(env,s.env) #s.env overrides ENV
         @unix_only @dependent_steps begin
             CreateDirectory(s.builddir)
-            `echo test`
             begin
                 ChangeDirectory(s.builddir)
-    			()->println(s.src)
-                @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), `$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`)
-                FileRule(s.libname,MakeTargets())
-                FileRule(s.installed_libname,MakeTargets("install"))
+                @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
+                FileRule(s.libtarget,MakeTargets(;env=env))
+                FileRule(s.installed_libpath,MakeTargets("install";env=env))
             end
         end
 
@@ -375,8 +348,8 @@ module BinDeps
     		begin
                 ChangeDirectory(s.src)
     			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),`sh -c $cmdstring`)
-                FileRule(s.libname,MakeTargets())
-                FileRule(s.installed_libname,MakeTargets("install"))
+                FileRule(s.libtarget,MakeTargets())
+                FileRule(s.installed_libpath,MakeTargets("install"))
             end
     	end
     end
@@ -386,9 +359,9 @@ module BinDeps
     end
 
     function run(s::FileRule)
-        if(!isfile(s.file))
+        if(!any(map(isfile,s.file)))
             run(s.step)
-    		if(!isfile(s.file))
+    		if(!any(map(isfile,s.file)))
     			error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
     		end
         end
@@ -428,7 +401,7 @@ module BinDeps
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
     	@build_steps begin
             FileDownloader(url,local_file)
-            FileUnpacker(local_file,joinpath(depsdir,"src",directory_name))
+            FileUnpacker(local_file,joinpath(depsdir,"src"),directory_name)
     	end
     end
 
@@ -439,10 +412,43 @@ module BinDeps
         dir = joinpath(joinpath(depsdir,"builds"),directory)
         prepare_src(depsdir,url, downloaded_file,directory_name) |
     	@build_steps begin
-            AutotoolsDependency(srcdir,prefix,dir,configure_opts,libname,joinpath(libdir,installed_libname),confstatusdir)
+            AutotoolsDependency(srcdir=srcdir,prefix=prefix,builddir=dir,configure_options=configure_opts,libtarget=libname,installed_libpath=[joinpath(libdir,installed_libname)],config_status_dir=confstatusdir)
         end
     end
     autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname) = autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, "")
     autotools_install(depsdir,url, downloaded_file, configure_opts, directory, libname)=autotools_install(depsdir,url,downloaded_file,configure_opts,directory,directory,libname,libname)
 
+    autotools_install(args...) = error("autotools_install has been removed")
+
+    const installed_homebrew_packages = Set{ASCIIString}()
+
+    function cacheHomebrewPackages()
+        empty!(installed_homebrew_packages)
+        for pkg in EachLine(read_from(`brew list`)[1])
+            add!(installed_homebrew_packages,chomp(pkg))
+        end
+        installed_homebrew_packages
+    end
+
+    type HomebrewInstall <: BuildStep
+        name::ASCIIString
+        desired_options::Vector{ASCIIString}
+        required_options::Vector{ASCIIString}
+        HomebrewInstall(name,desired_options) = new(name,desired_options,ASCIIString[])
+        HomebrewInstall(name,desired_options,required_options) = error("required_options not implemented yet")
+    end
+
+    function run(x::HomebrewInstall)
+        if(isempty(installed_homebrew_packages))
+            cacheHomebrewPackages()
+        end
+        if(has(installed_homebrew_packages,x.name))
+            info("Package already installed")
+        else
+            run(`brew install $(x.desired_options) $(x.name)`)
+        end
+        cacheHomebrewPackages()
+    end
+
+    include("dependencies.jl")
 end
