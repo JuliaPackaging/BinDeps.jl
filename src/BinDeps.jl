@@ -138,12 +138,14 @@ module BinDeps
         prefix::String
         builddir::String
         configure_options::Vector{String}
-        libtarget::String
+        libtarget::Vector{String}
+        include_dirs::Vector{String}
+        lib_dirs::Vector{String}
         installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
     	config_status_dir::String
         env
-        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = "", installed_libpath = ByteString[], config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
-            new(srcdir,prefix,builddir,configure_options,libtarget,installed_libpath,config_status_dir,env)
+        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], installed_libpath = ByteString[], config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,installed_libpath,config_status_dir,env)
     end
 
     ### Choices
@@ -334,6 +336,23 @@ module BinDeps
         env = similar(s.env)
         merge!(env,ENV)
         merge!(env,s.env) #s.env overrides ENV
+
+        for path in s.include_dirs
+            if !haskey(env,"CPPFLAGS")
+                env["CPPFLAGS"] = ""
+            end
+            env["CPPFLAGS"]*=" -I$path"
+        end
+
+        for path in s.lib_dirs
+            if !haskey(env,"LDFLAGS")
+                env["LDFLAGS"] = ""
+            end
+            env["LDFLAGS"]*=" -L$path"
+        end
+
+
+        println(env)
         @unix_only @dependent_steps begin
             CreateDirectory(s.builddir)
             begin

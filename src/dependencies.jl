@@ -35,6 +35,7 @@ depsdir(dep) = joinpath(pkgdir(dep),"deps")
 usrdir(dep) = joinpath(depsdir(dep),"usr")
 libdir(dep) = joinpath(usrdir(dep),"lib")
 bindir(dep) = joinpath(usrdir(dep),"bin")
+includedir(dep) = joinpath(usrdir(dep),"include")
 builddir(dep) = joinpath(depsdir(dep),"builds")
 downloadsdir(dep) = joinpath(depsdir(dep),"downloads")
 sourcesdir(dep) = joinpath(depsdir(dep),"src")
@@ -163,6 +164,7 @@ function generate_steps(h::NetworkSource,dep::LibraryDependency)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	@build_steps begin
 		FileDownloader(string(h.uri),localfile)
+		CreateDirectory(sourcesdir(dep))
 		FileUnpacker(localfile,joinpath(sourcesdir(dep)),"")
 	end
 end
@@ -215,10 +217,22 @@ function generate_steps(h::Autotools, dep::LibraryDependency)
 	elseif !haskey(opts,:installed_libpath)
 		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*shlib_ext for x in get(dep.properties,:aliases,ByteString[])]
 	end
+	if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
+		opts[:libtarget] = ByteString[x*"."*shlib_ext for x in dep.properties[:aliases]]
+	end
+	if !haskey(opts,:include_dirs)
+		opts[:include_dirs] = String[]
+	end
+	if !haskey(opts,:lib_dirs)
+		opts[:include_dirs] = String[]
+	end
+	push!(opts[:include_dirs],includedir(dep))
+	push!(opts[:lib_dirs],libdir(dep))
 	env = Dict{ByteString,ByteString}()
 	env["PKG_CONFIG_PATH"] = env["PKG_CONFIG_LIBDIR"] = joinpath(libdir(dep),"pkgconfig")
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
+	haskey(opts,:env) && merge!(env,opts[:env])
 	opts[:env] = env
 	steps |= AutotoolsDependency(;opts...) 
 	steps
@@ -263,11 +277,12 @@ execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
 
 macro install()
 	esc(quote
-		for d in bindeps_context.deps
-			BinDeps.satisfy!(d)
-		end
-		isdefined(Pkg2,:markworking) && Pkg2.markworking(bindeps_context.package)
-	end)
+		if bindeps_context.do_install
+			for d in bindeps_context.deps
+				BinDeps.satisfy!(d)
+			end
+			isdefined(Pkg2,:markworking) && Pkg2.markworking(bindeps_context.package)
+		end	end)
 end
 
 # Usage: @load_dependencies [file] [filter]
@@ -340,14 +355,26 @@ macro load_dependencies(args...)
 		end
 		name = sym = dep.name
 		if arg1 !== nothing
-			if (isa(arg1,Vector) || (typeof(arg1) <: Associative)) && 
-			  all(map(x->(x == Symbol || x <: String),eltype(arg1)))
+			if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: String),eltype(arg1)))
 				found = false
-				for need in (isa(arg1,Vector) ? arg1 : keys(arg1))
+				for need in keys(args1)
 					found = (dep.name == string(need))
 					if found
-						sym = isa(arg1,Vector) ? sym : arg1[need]
+						sym = arg1[need]
 						delete!(arg1,need)
+						break
+					end
+				end
+				if !found
+					continue
+				end
+			elseif isa(arg1,Vector) && ((eltype(arg1) == Symbol) || (eltype(arg1) <: String))
+				found = false
+				for i = 1:length(args)
+					found = (dep.name == string(arg1[i]))
+					if found
+						sym = arg1[i]
+						splice!(arg1,i)
 						break
 					end
 				end
