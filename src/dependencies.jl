@@ -357,7 +357,7 @@ macro load_dependencies(args...)
 		if arg1 !== nothing
 			if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: String),eltype(arg1)))
 				found = false
-				for need in keys(args1)
+				for need in keys(arg1)
 					found = (dep.name == string(need))
 					if found
 						sym = arg1[need]
