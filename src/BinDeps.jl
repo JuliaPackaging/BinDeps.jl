@@ -303,7 +303,7 @@ module BinDeps
         path,extension = splitext(path)
         base_filename,secondary_extension = splitext(path)
         if extension == ".tgz" || extension == ".tbz" || extension == ".zip" && !isempty(secondary_extension)
-            directory *= "."*secondary_extension
+            base_filename *= secondary_extension
             secondary_extension = ""
         end
         (base_filename,extension,secondary_extension)
