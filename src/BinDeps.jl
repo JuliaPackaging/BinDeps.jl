@@ -78,7 +78,7 @@ module BinDeps
     end
 
     @windows_only begin
-        function unpack_cmd(file,directory,path,target)
+        function unpack_cmd(file,directory,extension,secondary_extension)
             if((extension == ".gz" || extension == ".xz" || extension == ".bz2") && secondary_extension == ".tar") ||
                    extension == ".tgz" || extension == ".tbz"
                 return (`7z x $file -y -so`|>`7z x -si -y -ttar -o$directory`)
@@ -302,6 +302,10 @@ module BinDeps
     function splittarpath(path) 
         path,extension = splitext(path)
         base_filename,secondary_extension = splitext(path)
+        if extension == ".tgz" || extension == ".tbz" || extension == ".zip" && !isempty(secondary_extension)
+            directory *= "."*secondary_extension
+            secondary_extension = ""
+        end
         (base_filename,extension,secondary_extension)
     end
     function lower(s::FileUnpacker,collection)

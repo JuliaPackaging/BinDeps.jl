@@ -224,7 +224,7 @@ function generate_steps(h::Autotools, dep::LibraryDependency)
 		opts[:include_dirs] = String[]
 	end
 	if !haskey(opts,:lib_dirs)
-		opts[:include_dirs] = String[]
+		opts[:lib_dirs] = String[]
 	end
 	push!(opts[:include_dirs],includedir(dep))
 	push!(opts[:lib_dirs],libdir(dep))
