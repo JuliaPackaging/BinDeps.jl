@@ -111,6 +111,10 @@ module BinDeps
         CreateDirectory(dest) = new(dest,true)
     end
 
+    immutable RemoveDirectory <: BuildStep
+        dest::String
+    end
+
     type FileDownloader <: BuildStep
         src::String     #url
         dest::String    #local_file
@@ -143,9 +147,10 @@ module BinDeps
         lib_dirs::Vector{String}
         installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
     	config_status_dir::String
+        force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], installed_libpath = ByteString[], config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
-            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,installed_libpath,config_status_dir,env)
+        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
     ### Choices
@@ -296,6 +301,7 @@ module BinDeps
     lower(s::Nothing,collection) = nothing
     lower(s::Function,collection) = push!(collection,s)
     lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(println(s.dest);mkpath(s.dest))), )
+    lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )
     lower(s::BuildStep,collection) = push!(collection,s)
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
     lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
@@ -355,6 +361,11 @@ module BinDeps
             env["LDFLAGS"]*=" -L$path"
         end
 
+        if s.force_rebuild
+            @dependent_steps begin
+                RemoveDirectory(s.builddir)
+            end 
+        end
 
         println(env)
         @unix_only @dependent_steps begin
@@ -363,16 +374,17 @@ module BinDeps
                 ChangeDirectory(s.builddir)
                 @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
                 FileRule(s.libtarget,MakeTargets(;env=env))
-                FileRule(s.installed_libpath,MakeTargets("install";env=env))
+                MakeTargets("install";env=env)
             end
         end
 
     	@windows_only @dependent_steps begin
+            CreateDirectory(s.builddir)
     		begin
                 ChangeDirectory(s.src)
     			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),`sh -c $cmdstring`)
                 FileRule(s.libtarget,MakeTargets())
-                FileRule(s.installed_libpath,MakeTargets("install"))
+                MakeTargets("install")
             end
     	end
     end

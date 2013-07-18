@@ -21,6 +21,7 @@ type LibraryDependency
 	providers::Vector{(DependencyProvider,Dict{Symbol,Any})}
 	helpers::Vector{DependencyHelper}
 	properties::Dict{Symbol,Any}
+	libvalidate::Function
 end
 
 import Base: show
@@ -39,9 +40,20 @@ includedir(dep) = joinpath(usrdir(dep),"include")
 builddir(dep) = joinpath(depsdir(dep),"builds")
 downloadsdir(dep) = joinpath(depsdir(dep),"downloads")
 sourcesdir(dep) = joinpath(depsdir(dep),"src")
+libdir(provider, dep) = libdir(dep)
+
+successful_validate(l,p) = true
 
 function library_dependency(context::PackageContext, name; properties...)
-	r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),DependencyHelper[],(Symbol=>Any)[name => value for (name,value) in properties])
+	validate = successful_validate
+	for i in 1:length(properties)
+		k,v = properties[i]
+		if k == :validate
+			validate = v
+			delete!(properties,i)
+		end
+	end
+	r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),DependencyHelper[],(Symbol=>Any)[name => value for (name,value) in properties],validate)
 	push!(context.deps,r)
 	r
 end
@@ -85,6 +97,8 @@ type AptGet <: PackageManager
 	package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
+
+libdir(p::AptGet,dep) = "/usr/lib"
 
 const has_yum = try success(`yum -v`) catch e false end
 type Yum <: PackageManager
@@ -156,10 +170,30 @@ function provides{T}(::Type{T},providers::Dict; opts...)
 	end
 end
 
-generate_steps(h::BuildProcess,dep::LibraryDependency) = h.steps
-generate_steps(h::Homebrew,dep::LibraryDependency) = h.inst
-generate_steps(h::AptGet,dep::LibraryDependency) = `sudo apt-get install $(h.package)`
-generate_steps(h::Yum,dep::LibraryDependency) = `sudo yum install $(h.package)`
+
+generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
+generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
+function generate_steps(h::Homebrew,dep::LibraryDependency,opts) 
+	if get(opts,:force_rebuild,false) 
+		error("Will not force Homebrew to rebuild dependency \"$(dep.name)\".\n"*
+			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
+	end
+	return h.inst
+end
+function generate_steps(h::AptGet,dep::LibraryDependency,opts) 
+	if get(opts,:force_rebuild,false) 
+		error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
+			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
+	end
+	`sudo apt-get install $(h.package)`
+end
+function generate_steps(h::Yum,dep::LibraryDependency,opts) 
+	if get(opts,:force_rebuild,false) 
+		error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
+		  	  "Please make any necessary adjustments manually (This might just be a version upgrade)")
+	end
+	`sudo yum install $(h.package)`
+end
 function generate_steps(h::NetworkSource,dep::LibraryDependency) 
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	@build_steps begin
@@ -168,9 +202,10 @@ function generate_steps(h::NetworkSource,dep::LibraryDependency)
 		FileUnpacker(localfile,joinpath(sourcesdir(dep)),"")
 	end
 end
-function generate_steps(h::RemoteBinaries,dep::LibraryDependency) 
+function generate_steps(h::RemoteBinaries,dep::LibraryDependency,opts...) 
+	get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
-	@build_steps begin
+	steps = @build_steps begin
 		FileDownloader(string(h.uri),localfile)
 		FileUnpacker(localfile,usrdir(dep)," ")
 	end
@@ -196,13 +231,13 @@ end
 
 function generate_steps(dep::LibraryDependency,method)
 	(p,opts) = getprovider(dep,method)
-	!is(p,nothing) && return generate_steps(p,dep)
+	!is(p,nothing) && return generate_steps(p,dep,opts)
 	p = gethelper(dep,method)
 	!is(p,nothing) && return generate_steps(p,dep)
 	error("No provider or helper for method $method found for dependency $(dep.name)")
 end
 
-function generate_steps(h::Autotools, dep::LibraryDependency)
+function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	dump(dep.providers)
 	if is(h.source, nothing) 
 		h.source = gethelper(dep,Sources)
@@ -232,14 +267,48 @@ function generate_steps(h::Autotools, dep::LibraryDependency)
 	env["PKG_CONFIG_PATH"] = env["PKG_CONFIG_LIBDIR"] = joinpath(libdir(dep),"pkgconfig")
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
+	haskey(opts,:env) && println(opts[:env])
 	haskey(opts,:env) && merge!(env,opts[:env])
 	opts[:env] = env
+	if get(provider_opts,:force_rebuild,false)
+		opts[:force_rebuild] = true
+	end
 	steps |= AutotoolsDependency(;opts...) 
 	steps
 end
 
-function issatisfied(dep::LibraryDependency)
-	Base.find_library([dep.name,get(dep.properties,:aliases,ASCIIString[])],[libdir(dep)]) != ""
+function _find_library(dep::LibraryDependency)
+	# Same as find_library, buth with extra check defined by dep
+	libnames = [dep.name,get(dep.properties,:aliases,ASCIIString[])]
+	# Make sure we keep the defaults first, but also look in the other directories
+	providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
+    for lib in libnames
+        for (p,opts) in providers
+        	(p != nothing && can_provide(p,opts,dep)) || continue
+        	path = libdir(p,dep)
+        	isempty(path) && continue
+            l = joinpath(path, lib)
+            p = dlopen_e(l, RTLD_LAZY)
+            if p != C_NULL
+            	works = dep.libvalidate(l,p)
+                dlclose(p)
+                if works
+                	return l
+                else
+                	# We tried to load this providers' library, but it didn't satisfy
+                	# the requirements, so tell it to force a rebuild since the requirements
+                	# have most likely changed
+                	opts[:force_rebuild] = true
+                end
+            end
+        end
+        p = dlopen_e(lib, RTLD_LAZY)
+        if p != C_NULL && dep.libvalidate(lib,p)
+            dlclose(p)
+            return lib
+        end
+    end
+    return ""
 end
 
 # Default installation method
@@ -254,6 +323,14 @@ else
 end
 
 applicable(dep) = !haskey(dep.properties,:os) || (dep.properties[:os] == OS_NAME || (dep.properties[:os] == :Unix && Base.is_unix(OS_NAME)))
+function can_provide(p,opts,dep)
+	if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
+		return false
+	end
+	return true
+end
+
+issatisfied(dep) = _find_library(dep) != ""
 
 function satisfy!(dep::LibraryDependency)
 	if !issatisfied(dep) 
@@ -262,10 +339,8 @@ function satisfy!(dep::LibraryDependency)
 		end
 		for method in defaults
 			(p,opts) = getprovider(dep,method)
-			if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
-				continue
-			end
-			run(lower(generate_steps(p,dep)))
+			can_provide(p,opts,dep) || continue
+			run(lower(generate_steps(p,dep,opts)))
 			!issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
 			return
 		end

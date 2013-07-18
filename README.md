@@ -128,6 +128,17 @@ necessary. The ones that are currently used are:
  	will not trigger an error at runtime (and it will not be loaded), but if it
  	cannot be found at buildtime it will be installed (useful for build-time) 
  	dependencies of other binary dependencies. 
+ 
+ * `validate::Function`
+ 	You may pass a function to validate whether or not a certain library is usable,
+ 	e.g. whether or not has the correct version. To do so, pass a function that takes 
+ 	(name,handle) as an argument and returns `true` if the library is usable and `false` 
+ 	it not. The `name` argument is either an absolute path or the library name if it a
+ 	global system library, while the handle is a handle that may be passed to `ccall` or
+ 	`dlsym` to check library symbols or the return value of function. Note however that it 
+ 	is invalid to store the `handle`. Instead, use the `@load_dependencies` macro (see below).
+ 	Should the validation return false for a library that was installed by a provider, the 
+ 	provider will be instructed to force a rebuild.
 
 
 # The high level interface - Declaring build mechanisms
