@@ -60,8 +60,8 @@ end
 
 # This macro expects to be the first thing run. It attempts to deduce the package name and initializes the context
 macro setup()
-	dir = pwd()
-	package = basename(pwd())
+	dir = normpath(joinpath(pwd(),".."))
+	package = basename(dir)
 	esc(quote
 		if length(ARGS) > 0 && isa(ARGS[1],BinDeps.PackageContext)
 			bindeps_context = ARGS[1]
@@ -91,12 +91,14 @@ type Homebrew <: PackageManager
 end
 Homebrew(pkg::String) = Homebrew(HomebrewInstall(pkg,ASCIIString[]))
 can_use(::Type{Homebrew}) = has_homebrew && OS_NAME == :Darwin
+package_available(p::Homebrew) = can_use(Homebrew)
 
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
 	package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
+package_available(p::AptGet) = can_use(AptGet) && beginswith(readall(`apt-cache showpkg`),"Package:")
 
 libdir(p::AptGet,dep) = "/usr/lib"
 
@@ -261,8 +263,12 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	if !haskey(opts,:lib_dirs)
 		opts[:lib_dirs] = String[]
 	end
-	push!(opts[:include_dirs],includedir(dep))
-	push!(opts[:lib_dirs],libdir(dep))
+	if !haskey(opts,:rpath_dirs)
+		opts[:rpath_dirs] = String[]
+	end
+	unshift!(opts[:include_dirs],includedir(dep))
+	unshift!(opts[:lib_dirs],libdir(dep))
+	unshift!(opts[:rpath_dirs],libdir(dep))
 	env = Dict{ByteString,ByteString}()
 	env["PKG_CONFIG_PATH"] = env["PKG_CONFIG_LIBDIR"] = joinpath(libdir(dep),"pkgconfig")
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
@@ -284,7 +290,7 @@ function _find_library(dep::LibraryDependency)
 	providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
     for lib in libnames
         for (p,opts) in providers
-        	(p != nothing && can_provide(p,opts,dep)) || continue
+        	(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         	path = libdir(p,dep)
         	isempty(path) && continue
             l = joinpath(path, lib)
@@ -328,6 +334,13 @@ function can_provide(p,opts,dep)
 		return false
 	end
 	return true
+end
+
+function can_provide(p::PackageManager,opts,dep)
+	if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
+		return false
+	end
+	return package_available(p)
 end
 
 issatisfied(dep) = _find_library(dep) != ""

@@ -145,12 +145,13 @@ module BinDeps
         libtarget::Vector{String}
         include_dirs::Vector{String}
         lib_dirs::Vector{String}
+        rpath_dirs::Vector{String}
         installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
     	config_status_dir::String
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
-            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,installed_libpath,config_status_dir,force_rebuild,env)
+        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], rpath_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
     ### Choices
@@ -300,7 +301,7 @@ module BinDeps
     end
     lower(s::Nothing,collection) = nothing
     lower(s::Function,collection) = push!(collection,s)
-    lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(println(s.dest);mkpath(s.dest))), )
+    lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(mkpath(s.dest))), )
     lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )
     lower(s::BuildStep,collection) = push!(collection,s)
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
@@ -361,13 +362,21 @@ module BinDeps
             env["LDFLAGS"]*=" -L$path"
         end
 
+        for path in s.rpath_dirs
+            if !haskey(env,"LDFLAGS")
+                env["LDFLAGS"] = ""
+            end
+            env["LDFLAGS"]*=" -Wl,-rpath -Wl,$path"
+        end
+
+        println(env["LDFLAGS"])
+
         if s.force_rebuild
             @dependent_steps begin
                 RemoveDirectory(s.builddir)
             end 
         end
 
-        println(env)
         @unix_only @dependent_steps begin
             CreateDirectory(s.builddir)
             begin
