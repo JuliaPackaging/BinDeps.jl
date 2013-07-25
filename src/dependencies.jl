@@ -50,7 +50,7 @@ function library_dependency(context::PackageContext, name; properties...)
 		k,v = properties[i]
 		if k == :validate
 			validate = v
-			delete!(properties,i)
+			splice!(properties,i)
 		end
 	end
 	r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),DependencyHelper[],(Symbol=>Any)[name => value for (name,value) in properties],validate)
@@ -98,7 +98,7 @@ type AptGet <: PackageManager
 	package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
-package_available(p::AptGet) = can_use(AptGet) && beginswith(readall(`apt-cache showpkg`),"Package:")
+package_available(p::AptGet) = can_use(AptGet) && beginswith(readall(`apt-cache showpkg $(p.package)`),"Package:")
 
 libdir(p::AptGet,dep) = "/usr/lib"
 
