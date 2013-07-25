@@ -369,8 +369,6 @@ module BinDeps
             env["LDFLAGS"]*=" -Wl,-rpath -Wl,$path"
         end
 
-        println(env["LDFLAGS"])
-
         if s.force_rebuild
             @dependent_steps begin
                 RemoveDirectory(s.builddir)
