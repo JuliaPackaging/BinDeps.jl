@@ -127,6 +127,12 @@ type RemoteBinaries <: Binaries
 	uri::URI
 end
 
+type CustomPathBinaries <: Binaries
+	path::String
+end
+
+libdir(p::CustomPathBinaries,dep) = p.path
+
 abstract BuildProcess <: DependencyProvider
 
 type SimpleBuild <: BuildProcess
@@ -151,6 +157,7 @@ export Homebrew, AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotoo
 provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
 provider(::Type{Binaries},uri::URI; opts...) = RemoteBinaries(uri)
+provider(::Type{Binaries},path::String; opts...) = CustomPathBinaries(path)
 provider(::Type{SimpleBuild},steps; opts...) = SimpleBuild(steps)
 provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; opts...)
 provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection); opts...) = provider(SimpleBuild,steps; opts...)
@@ -284,7 +291,7 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 end
 
 function _find_library(dep::LibraryDependency)
-	# Same as find_library, buth with extra check defined by dep
+	# Same as find_library, but with extra check defined by dep
 	libnames = [dep.name,get(dep.properties,:aliases,ASCIIString[])]
 	# Make sure we keep the defaults first, but also look in the other directories
 	providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
@@ -481,8 +488,22 @@ macro load_dependencies(args...)
 		errorcase = Expr(:block)
 		pkg != "" && isdefined(Pkg2,:markworking) && push!(errorcase.args,:(Pkg2.markworking($pkg,false)))
 		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg2.fixup() to install missing dependencies!")))
+		
+		# mirror logic in _find_library
+		libdirs = ASCIIString[]
+		providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
+		for (p,opts) in providers
+			(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
+        	path = libdir(p,dep)
+        	isempty(path) && continue
+			push!(libdirs,path)
+		end
+		# add default search path. Should this logic be here?
+		push!(libdirs,libdir(dep))
+
+		unique([[libdir(p,dep) for p in defaults],dep.providers])
 		push!(ret.args,quote
-			const $(esc(s)) = Base.find_library([$(dep.name),$(get(dep.properties,:aliases,ASCIIString[]))],[$(libdir(dep))])
+			const $(esc(s)) = Base.find_library([$(dep.name),$(get(dep.properties,:aliases,ASCIIString[]))],$libdirs)
 			if isempty($(esc(s)))
 				$errorcase
 			end
