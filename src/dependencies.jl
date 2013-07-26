@@ -83,7 +83,6 @@ end
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
 
 abstract PackageManager <: DependencyProvider
-
 const has_homebrew = try success(`brew -v`) catch e false end
 
 type Homebrew <: PackageManager 
@@ -99,6 +98,14 @@ type AptGet <: PackageManager
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
 package_available(p::AptGet) = can_use(AptGet) && beginswith(readall(`apt-cache showpkg $(p.package)`),"Package:")
+function available_version(p::AptGet)
+	for l in eachline(`apt-cache show $(p.package)`)
+		if beginswith(l,"Version:")
+			return convert(VersionNumber,l[(1+length("Version: ")):end])
+		end
+	end
+	error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
+end
 
 libdir(p::AptGet,dep) = "/usr/lib"
 
@@ -152,7 +159,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(gethelper(x.de
 
 Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
 
-export Homebrew, AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild
+export Homebrew, AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -280,7 +287,6 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	env["PKG_CONFIG_PATH"] = env["PKG_CONFIG_LIBDIR"] = joinpath(libdir(dep),"pkgconfig")
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
-	haskey(opts,:env) && println(opts[:env])
 	haskey(opts,:env) && merge!(env,opts[:env])
 	opts[:env] = env
 	if get(provider_opts,:force_rebuild,false)
@@ -292,14 +298,14 @@ end
 
 function _find_library(dep::LibraryDependency)
 	# Same as find_library, but with extra check defined by dep
-	libnames = [dep.name,get(dep.properties,:aliases,ASCIIString[])]
+	libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
 	# Make sure we keep the defaults first, but also look in the other directories
 	providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
-    for lib in libnames
-        for (p,opts) in providers
-        	(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-        	path = libdir(p,dep)
-        	isempty(path) && continue
+    for (p,opts) in providers
+    	(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
+    	path = libdir(p,dep)
+    	isempty(path) && continue
+        for lib in libnames
             l = joinpath(path, lib)
             p = dlopen_e(l, RTLD_LAZY)
             if p != C_NULL
@@ -315,10 +321,16 @@ function _find_library(dep::LibraryDependency)
                 end
             end
         end
+    end
+    # Now check system libraries
+    for lib in libnames
         p = dlopen_e(lib, RTLD_LAZY)
-        if p != C_NULL && dep.libvalidate(lib,p)
+        if p != C_NULL 
+        	works = dep.libvalidate(lib,p)
             dlclose(p)
-            return lib
+            if works
+            	return lib
+            end
         end
     end
     return ""
@@ -340,14 +352,29 @@ function can_provide(p,opts,dep)
 	if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
 		return false
 	end
-	return true
+	if !haskey(opts,:validate)
+		return true
+	elseif isa(opts[:validate],Bool)
+		return opts[:validate]
+	else
+		return opts[:validate](p,dep)
+	end
 end
 
 function can_provide(p::PackageManager,opts,dep)
 	if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
 		return false
 	end
-	return package_available(p)
+	if !package_available(p)
+		return false
+	end
+	if !haskey(opts,:validate)
+		return true
+	elseif isa(opts[:validate],Bool)
+		return opts[:validate]
+	else
+		return opts[:validate](p,dep)
+	end
 end
 
 issatisfied(dep) = _find_library(dep) != ""
@@ -360,6 +387,12 @@ function satisfy!(dep::LibraryDependency)
 		for method in defaults
 			(p,opts) = getprovider(dep,method)
 			can_provide(p,opts,dep) || continue
+			if haskey(opts,:force_depends)
+				for (dmethod,ddep) in opts[:force_depends]
+					(dp,dopts) = getprovider(ddep,dmethod)
+					run(lower(generate_steps(dp,ddep,dopts)))
+				end
+			end
 			run(lower(generate_steps(p,dep,opts)))
 			!issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
 			return
@@ -411,9 +444,10 @@ macro load_dependencies(args...)
     file = "../deps/build.jl"
     if length(args) == 1 
 		if isa(args[1],Expr)
-	    	    arg1 = eval(args[1])
+	    	arg1 = eval(args[1])
 		elseif typeof(args[1]) <: String
 		    file = args[1]
+		    dir = dirname(normpath(joinpath(dirname(file),"..")))
 	    elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
 	    	arg1 = args[1]
 	    else
@@ -489,21 +523,8 @@ macro load_dependencies(args...)
 		pkg != "" && isdefined(Pkg2,:markworking) && push!(errorcase.args,:(Pkg2.markworking($pkg,false)))
 		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg2.fixup() to install missing dependencies!")))
 		
-		# mirror logic in _find_library
-		libdirs = ASCIIString[]
-		providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
-		for (p,opts) in providers
-			(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-        	path = libdir(p,dep)
-        	isempty(path) && continue
-			push!(libdirs,path)
-		end
-		# add default search path. Should this logic be here?
-		push!(libdirs,libdir(dep))
-
-		unique([[libdir(p,dep) for p in defaults],dep.providers])
 		push!(ret.args,quote
-			const $(esc(s)) = Base.find_library([$(dep.name),$(get(dep.properties,:aliases,ASCIIString[]))],$libdirs)
+			const $(esc(s)) = BinDeps._find_library($dep)
 			if isempty($(esc(s)))
 				$errorcase
 			end
