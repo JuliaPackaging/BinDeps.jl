@@ -213,8 +213,11 @@ We have already seen the `Homebrew`, `Cairo` and `Yum` providers, which all take
 
  * Binaries
 
- 	Takes a `URI` object as its data argument and declared that the binaries may be 
- 	downloaded from the provided URI.
+ 	If given a `URI` object as its data argument, indicates that the binaries may be 
+ 	downloaded from the provided URI. It is assumed that the binaries unpack the
+	libraries into ``usr/lib``. If given a ``String`` as its data argument, provides
+	a custom search path for the binaries. A typical use might be to allow the 
+	user to provide a custom path with an environmental variable. 
 
  * BuildProcess
 

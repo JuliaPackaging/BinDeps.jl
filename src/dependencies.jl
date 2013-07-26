@@ -72,14 +72,6 @@ macro setup()
 	end)
 end
 
-macro if_install(expr)
-	esc(quote
-		if bindeps_context.do_install
-			$expr
-		end
-	end)
-end
-	
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
 
 abstract PackageManager <: DependencyProvider
