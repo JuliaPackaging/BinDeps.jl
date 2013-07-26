@@ -16,7 +16,7 @@ the actual package, I want to answer a few common questions:
   * Do I need to use this package if I want to build binary
     dependencies for my Julia package?
 
-    Absolutely not! The system is designed to give the maximum amountl
+    Absolutely not! The system is designed to give the maximum amount
     of freedom to the package author in order to be able to address any 
     situation that one may encounter in the real world. This is achieved
     by simply evaluating a file called `deps/build.jl` (if it exists) in
