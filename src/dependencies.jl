@@ -19,7 +19,7 @@ type LibraryDependency
 	name::String
 	context::PackageContext
 	providers::Vector{(DependencyProvider,Dict{Symbol,Any})}
-	helpers::Vector{DependencyHelper}
+	helpers::Vector{(DependencyHelper,Dict{Symbol,Any})}
 	properties::Dict{Symbol,Any}
 	libvalidate::Function
 end
@@ -44,7 +44,7 @@ libdir(provider, dep) = libdir(dep)
 
 successful_validate(l,p) = true
 
-function library_dependency(context::PackageContext, name; properties...)
+function _library_dependency(context::PackageContext, name; properties...)
 	validate = successful_validate
 	for i in 1:length(properties)
 		k,v = properties[i]
@@ -53,7 +53,7 @@ function library_dependency(context::PackageContext, name; properties...)
 			splice!(properties,i)
 		end
 	end
-	r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),DependencyHelper[],(Symbol=>Any)[name => value for (name,value) in properties],validate)
+	r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),Array((DependencyHelper,Dict{Symbol,Any}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
 	push!(context.deps,r)
 	r
 end
@@ -68,9 +68,11 @@ macro setup()
 		else
 			bindeps_context = BinDeps.PackageContext(true,$dir,$package,{})
 		end
-		library_dependency(args...; properties...) = BinDeps.library_dependency(bindeps_context,args...;properties...)
+		library_dependency(args...; properties...) = BinDeps._library_dependency(bindeps_context,args...;properties...)
 	end)
 end
+
+export library_dependency
 
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
 
@@ -120,7 +122,10 @@ type NetworkSource <: Sources
 	uri::URI
 end
 
-srcdir(s::NetworkSource, dep::LibraryDependency) = joinpath(sourcesdir(dep),splittarpath(basename(s.uri.path))[1])
+srcdir(s::Sources, dep::LibraryDependency) = srcdir(s,dep,(Symbol=>Any)[])
+function srcdir(s::NetworkSource, dep::LibraryDependency, opts) 
+	joinpath(sourcesdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
+end
 
 type RemoteBinaries <: Binaries
 	uri::URI
@@ -139,7 +144,7 @@ type SimpleBuild <: BuildProcess
 end
 
 type Autotools <: BuildProcess
-	source::Union(Sources,Nothing)
+	source
 	opts
 end
 
@@ -163,7 +168,7 @@ provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection);
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,helper)
+provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
 function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...) 
 	p = provider(T,ps; opts...)
@@ -202,12 +207,13 @@ function generate_steps(h::Yum,dep::LibraryDependency,opts)
 	end
 	`sudo yum install $(h.package)`
 end
-function generate_steps(h::NetworkSource,dep::LibraryDependency) 
+function generate_steps(h::NetworkSource,dep::LibraryDependency,opts)
+	println("OPTS:",opts) 
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	@build_steps begin
 		FileDownloader(string(h.uri),localfile)
 		CreateDirectory(sourcesdir(dep))
-		FileUnpacker(localfile,joinpath(sourcesdir(dep)),"")
+		FileUnpacker(localfile,sourcesdir(dep),srcdir(h,dep,opts))
 	end
 end
 function generate_steps(h::RemoteBinaries,dep::LibraryDependency,opts...) 
@@ -229,19 +235,19 @@ function getprovider(dep::LibraryDependency,method)
 end
 
 function gethelper(dep::LibraryDependency,method)
-	for p = dep.helpers
+	for (p,opts) = dep.helpers
 		if typeof(p) <: method
-			return p
+			return (p,opts)
 		end
 	end
-	return nothing
+	return (nothing,nothing)
 end
 
 function generate_steps(dep::LibraryDependency,method)
 	(p,opts) = getprovider(dep,method)
 	!is(p,nothing) && return generate_steps(p,dep,opts)
-	p = gethelper(dep,method)
-	!is(p,nothing) && return generate_steps(p,dep)
+	(p,hopts) = gethelper(dep,method)
+	!is(p,nothing) && return generate_steps(p,dep,hopts)
 	error("No provider or helper for method $method found for dependency $(dep.name)")
 end
 
@@ -250,9 +256,12 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	if is(h.source, nothing) 
 		h.source = gethelper(dep,Sources)
 	end
+	if isa(h.source,Sources)
+		h.source = (h.source,(Symbol=>Any)[])
+	end
 	is(h.source, nothing) && error("Could not obtain sources for dependency $(dep.name)")
-	steps = lower(generate_steps(h.source,dep))
-	opts = {:srcdir=>srcdir(h.source,dep), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
+	steps = lower(generate_steps(h.source[1],dep,h.source[2]))
+	opts = {:srcdir=>srcdir(h.source[1],dep,h.source[2]), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
 	merge!(opts,h.opts)
 	if haskey(opts,:installed_libname)
 		!haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")

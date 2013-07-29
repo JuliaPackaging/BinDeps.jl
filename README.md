@@ -208,7 +208,16 @@ We have already seen the `Homebrew`, `Cairo` and `Yum` providers, which all take
  	Takes a `URI` object as its data argument and declared that the sources may be 
  	downloaded from the provided URI. This dependency is special, because it's 
  	success does not automatically mark the build as succeeded (in BinDeps 
- 	terminology, it's a "helper").
+ 	terminology, it's a "helper"). By default this provider expects the unpacked
+ 	directory name to be that of the archive downloaded. If that is not the case, 
+ 	you may use the :unpacked_dir option to specify the name of the unpacked directory,
+ 	e.g.
+
+```
+provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"),libvirt,
+		unpacked_dir="libvirt-1.1.1")
+```
+
 
  * Binaries
 
