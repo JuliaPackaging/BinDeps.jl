@@ -122,8 +122,8 @@ type NetworkSource <: Sources
 	uri::URI
 end
 
-srcdir(s::Sources, dep::LibraryDependency) = srcdir(s,dep,(Symbol=>Any)[])
-function srcdir(s::NetworkSource, dep::LibraryDependency, opts) 
+srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,(Symbol=>Any)[])
+function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
 	joinpath(sourcesdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
@@ -152,7 +152,7 @@ type GetSources <: BuildStep
 	dep::LibraryDependency
 end
 
-lower(x::GetSources,collection) = push!(collection,generate_steps(gethelper(x.dep,Sources),x.dep))
+lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelper(x.dep,Sources)...))
 
 Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
 
@@ -186,37 +186,36 @@ end
 
 generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
 generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
-function generate_steps(h::Homebrew,dep::LibraryDependency,opts) 
+function generate_steps(dep::LibraryDependency,h::Homebrew,opts) 
 	if get(opts,:force_rebuild,false) 
 		error("Will not force Homebrew to rebuild dependency \"$(dep.name)\".\n"*
 			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
 	return h.inst
 end
-function generate_steps(h::AptGet,dep::LibraryDependency,opts) 
+function generate_steps(dep::LibraryDependency,h::AptGet,opts) 
 	if get(opts,:force_rebuild,false) 
 		error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
 			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
 	`sudo apt-get install $(h.package)`
 end
-function generate_steps(h::Yum,dep::LibraryDependency,opts) 
+function generate_steps(dep::LibraryDependency,h::Yum,opts) 
 	if get(opts,:force_rebuild,false) 
 		error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
 		  	  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
 	`sudo yum install $(h.package)`
 end
-function generate_steps(h::NetworkSource,dep::LibraryDependency,opts)
-	println("OPTS:",opts) 
+function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	@build_steps begin
 		FileDownloader(string(h.uri),localfile)
 		CreateDirectory(sourcesdir(dep))
-		FileUnpacker(localfile,sourcesdir(dep),srcdir(h,dep,opts))
+		FileUnpacker(localfile,sourcesdir(dep),srcdir(dep,h,opts))
 	end
 end
-function generate_steps(h::RemoteBinaries,dep::LibraryDependency,opts...) 
+function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts) 
 	get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	steps = @build_steps begin
@@ -251,7 +250,7 @@ function generate_steps(dep::LibraryDependency,method)
 	error("No provider or helper for method $method found for dependency $(dep.name)")
 end
 
-function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
+function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	dump(dep.providers)
 	if is(h.source, nothing) 
 		h.source = gethelper(dep,Sources)
@@ -259,9 +258,9 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	if isa(h.source,Sources)
 		h.source = (h.source,(Symbol=>Any)[])
 	end
-	is(h.source, nothing) && error("Could not obtain sources for dependency $(dep.name)")
-	steps = lower(generate_steps(h.source[1],dep,h.source[2]))
-	opts = {:srcdir=>srcdir(h.source[1],dep,h.source[2]), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
+	is(h.source[1], nothing) && error("Could not obtain sources for dependency $(dep.name)")
+	steps = lower(generate_steps(dep,h.source...))
+	opts = {:srcdir=>srcdir(dep,h.source...), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
 	merge!(opts,h.opts)
 	if haskey(opts,:installed_libname)
 		!haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
@@ -280,6 +279,9 @@ function generate_steps(h::Autotools, dep::LibraryDependency, provider_opts)
 	end
 	if !haskey(opts,:rpath_dirs)
 		opts[:rpath_dirs] = String[]
+	end
+	if haskey(opts,:configure_subdir)
+		opts[:srcdir] = joinpath(opts[:srcdir],delete!(opts,:configure_subdir))
 	end
 	unshift!(opts[:include_dirs],includedir(dep))
 	unshift!(opts[:lib_dirs],libdir(dep))
@@ -391,10 +393,10 @@ function satisfy!(dep::LibraryDependency)
 			if haskey(opts,:force_depends)
 				for (dmethod,ddep) in opts[:force_depends]
 					(dp,dopts) = getprovider(ddep,dmethod)
-					run(lower(generate_steps(dp,ddep,dopts)))
+					run(lower(generate_steps(ddep,dp,dopts)))
 				end
 			end
-			run(lower(generate_steps(p,dep,opts)))
+			run(lower(generate_steps(dep,p,opts)))
 			!issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
 			return
 		end
