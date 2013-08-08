@@ -28,11 +28,6 @@ the actual package, I want to answer a few common questions:
     run(`make`)
 ```
 
-	The second command is optional and tells the package manger, not to
-	consider this package broken in the `fixup` method. Unless you add 
-	additional code to your package, it has no other effect and can thus
-	be considered optional though recommended. 
-
   * I want to use BinDeps, but it is missing some functionality I need  
     (e.g. a package manager)
 
@@ -63,7 +58,7 @@ the actual package, I want to answer a few common questions:
 		downloads/  	# Store any binary/source downloads here
 		builds/		
 			dep1/		# out-of-tree build for dep1, is possible
-			dep2/   	# out-of-tree build for dep1, is possible
+			dep2/   	# out-of-tree build for dep2, is possible
 		    ...
 		src/		
 			dep1/   	# Source code for dep1
@@ -132,7 +127,7 @@ necessary. The ones that are currently used are:
  	You may pass a function to validate whether or not a certain library is usable,
  	e.g. whether or not has the correct version. To do so, pass a function that takes 
  	(name,handle) as an argument and returns `true` if the library is usable and `false` 
- 	it not. The `name` argument is either an absolute path or the library name if it a
+ 	it not. The `name` argument is either an absolute path or the library name if it is a
  	global system library, while the handle is a handle that may be passed to `ccall` or
  	`dlsym` to check library symbols or the return value of function. Note however that it 
  	is invalid to store the `handle`. Instead, use the `@load_dependencies` macro (see below).
@@ -305,12 +300,12 @@ which will assign the result to the `_foo` and `_bar` variables instead.
 		end
 	end
 ```
-	All the steps are executed synchronously. The result of the `@build_steps` macro 
-	may be passed to run to execute it directly, thought this is not recommended other
-	than for debugging purposes. Instead, please use the high level interface to tie 
-	the build process to dependencies. 
+    All the steps are executed synchronously. The result of the `@build_steps` macro 
+    may be passed to run to execute it directly, thought this is not recommended other
+    than for debugging purposes. Instead, please use the high level interface to tie 
+    the build process to dependencies. 
 
-	Some of the build builtin build steps are:
+    Some of the builtin build steps are:
 
   * FileDownloader(remote_file,local_file)
 
