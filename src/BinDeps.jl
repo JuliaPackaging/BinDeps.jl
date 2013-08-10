@@ -306,6 +306,7 @@ module BinDeps
     lower(s::BuildStep,collection) = push!(collection,s)
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
     lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
+    splittarpath(path::SubString) = splittarpath(bytestring(path))
     function splittarpath(path) 
         path,extension = splitext(path)
         base_filename,secondary_extension = splitext(path)
