@@ -287,7 +287,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	unshift!(opts[:lib_dirs],libdir(dep))
 	unshift!(opts[:rpath_dirs],libdir(dep))
 	env = Dict{ByteString,ByteString}()
-	env["PKG_CONFIG_PATH"] = env["PKG_CONFIG_LIBDIR"] = joinpath(libdir(dep),"pkgconfig")
+	env["PKG_CONFIG_PATH"] = joinpath(libdir(dep),"pkgconfig")
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
 	haskey(opts,:env) && merge!(env,opts[:env])
