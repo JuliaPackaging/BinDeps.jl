@@ -85,6 +85,7 @@ end
 Homebrew(pkg::String) = Homebrew(HomebrewInstall(pkg,ASCIIString[]))
 can_use(::Type{Homebrew}) = has_homebrew && OS_NAME == :Darwin
 package_available(p::Homebrew) = can_use(Homebrew)
+pkg_name(a::Homebrew) = a.inst.name
 
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
@@ -100,6 +101,7 @@ function available_version(p::AptGet)
 	end
 	error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
 end
+pkg_name(a::AptGet) = a.package
 
 libdir(p::AptGet,dep) = "/usr/lib"
 
@@ -108,6 +110,7 @@ type Yum <: PackageManager
 	package::String
 end
 can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
+pkg_name(y::Yum) = y.package
 
 # Can use everything else without restriction by default
 can_use(::Type) = true

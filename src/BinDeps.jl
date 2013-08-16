@@ -493,4 +493,6 @@ module BinDeps
     end
 
     include("dependencies.jl")
+    include("debug.jl")
+    include("show.jl")
 end
