@@ -226,6 +226,7 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
 		FileUnpacker(localfile,usrdir(dep)," ")
 	end
 end
+generate_steps(dep::LibraryDependency,h::SimpleBuild,opts) = h.steps
 
 function getprovider(dep::LibraryDependency,method)
 	for (p,opts) = dep.providers
