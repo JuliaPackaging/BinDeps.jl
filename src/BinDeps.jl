@@ -82,7 +82,7 @@ module BinDeps
             if((extension == ".gz" || extension == ".xz" || extension == ".bz2") && secondary_extension == ".tar") ||
                    extension == ".tgz" || extension == ".tbz"
                 return (`7z x $file -y -so`|>`7z x -si -y -ttar -o$directory`)
-            elseif extension == ".zip"
+            elseif extension == ".zip" || extension == ".7z"
                 return (`7z x $file -y -o$directory`)
             end
             error("I don't know how to unpack $file")
@@ -386,10 +386,9 @@ module BinDeps
         end
 
     	@windows_only @dependent_steps begin
-            CreateDirectory(s.builddir)
     		begin
                 ChangeDirectory(s.src)
-    			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),`sh -c $cmdstring`)
+    			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
                 FileRule(s.libtarget,MakeTargets())
                 MakeTargets("install")
             end

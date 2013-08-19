@@ -39,8 +39,9 @@ bindir(dep) = joinpath(usrdir(dep),"bin")
 includedir(dep) = joinpath(usrdir(dep),"include")
 builddir(dep) = joinpath(depsdir(dep),"builds")
 downloadsdir(dep) = joinpath(depsdir(dep),"downloads")
-sourcesdir(dep) = joinpath(depsdir(dep),"src")
+srcdir(dep) = joinpath(depsdir(dep),"src")
 libdir(provider, dep) = libdir(dep)
+bindir(provider, dep) = bindir(dep)
 
 successful_validate(l,p) = true
 
@@ -72,7 +73,7 @@ macro setup()
 	end)
 end
 
-export library_dependency
+export library_dependency, bindir, srcdir, usrdir, libdir
 
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
 
@@ -127,7 +128,7 @@ end
 
 srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,(Symbol=>Any)[])
 function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
-	joinpath(sourcesdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
+	joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
 type RemoteBinaries <: Binaries
@@ -214,8 +215,8 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	@build_steps begin
 		FileDownloader(string(h.uri),localfile)
-		CreateDirectory(sourcesdir(dep))
-		FileUnpacker(localfile,sourcesdir(dep),srcdir(dep,h,opts))
+		CreateDirectory(srcdir(dep))
+		FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
 	end
 end
 function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts) 
@@ -223,18 +224,28 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	steps = @build_steps begin
 		FileDownloader(string(h.uri),localfile)
-		FileUnpacker(localfile,usrdir(dep)," ")
+		FileUnpacker(localfile,depsdir(dep),"usr")
 	end
 end
 generate_steps(dep::LibraryDependency,h::SimpleBuild,opts) = h.steps
 
-function getprovider(dep::LibraryDependency,method)
+function getoneprovider(dep::LibraryDependency,method)
 	for (p,opts) = dep.providers
 		if typeof(p) <: method && can_use(typeof(p))
 			return (p,opts)
 		end
 	end
 	return (nothing,nothing)
+end
+
+function getallproviders(dep::LibraryDependency,method)
+	ret = {}
+	for (p,opts) = dep.providers
+		if typeof(p) <: method && can_use(typeof(p))
+			push!(ret,(p,opts))
+		end
+	end
+	ret
 end
 
 function gethelper(dep::LibraryDependency,method)
@@ -247,7 +258,7 @@ function gethelper(dep::LibraryDependency,method)
 end
 
 function generate_steps(dep::LibraryDependency,method)
-	(p,opts) = getprovider(dep,method)
+	(p,opts) = getoneprovider(dep,method)
 	!is(p,nothing) && return generate_steps(p,dep,opts)
 	(p,hopts) = gethelper(dep,method)
 	!is(p,nothing) && return generate_steps(p,dep,hopts)
@@ -309,12 +320,15 @@ function _find_library(dep::LibraryDependency)
 	# Same as find_library, but with extra check defined by dep
 	libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
 	# Make sure we keep the defaults first, but also look in the other directories
-	providers = unique([[getprovider(dep,p) for p in defaults],dep.providers])
+	providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
     for (p,opts) in providers
     	(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-    	path = libdir(p,dep)
-    	isempty(path) && continue
-        for lib in libnames
+    	paths = String[]
+    	push!(paths,libdir(p,dep))
+    	# Windows, do you know what `lib` stands for???
+    	@windows_only push!(paths,bindir(p,dep))
+    	(isempty(paths) || all(map(isempty,paths))) && continue
+        for lib in libnames, path in paths
             l = joinpath(path, lib)
             p = dlopen_e(l, RTLD_LAZY)
             if p != C_NULL
@@ -398,23 +412,24 @@ end
 
 issatisfied(dep) = _find_library(dep) != ""
 
-function satisfy!(dep::LibraryDependency)
+function satisfy!(dep::LibraryDependency, methods = defaults)
 	if !issatisfied(dep) 
 		if !applicable(dep)
 			return
 		end
-		for method in defaults
-			(p,opts) = getprovider(dep,method)
-			can_provide(p,opts,dep) || continue
-			if haskey(opts,:force_depends)
-				for (dmethod,ddep) in opts[:force_depends]
-					(dp,dopts) = getprovider(ddep,dmethod)
-					run(lower(generate_steps(ddep,dp,dopts)))
+		for method in methods
+			for (p,opts) in getallproviders(dep,method)
+				can_provide(p,opts,dep) || continue
+				if haskey(opts,:force_depends)
+					for (dmethod,ddep) in opts[:force_depends]
+						(dp,dopts) = getprovider(ddep,dmethod)
+						run(lower(generate_steps(ddep,dp,dopts)))
+					end
 				end
+				run(lower(generate_steps(dep,p,opts)))
+				!issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
+				return
 			end
-			run(lower(generate_steps(dep,p,opts)))
-			!issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
-			return
 		end
 		error("None of the selected providers can install dependency $(dep.name)")
 	end
@@ -552,4 +567,16 @@ macro load_dependencies(args...)
 		end
 	end
 	ret
+end
+
+function build(pkg::String, method; dep::String="", force=false)
+    dir = Pkg2.dir(pkg)
+    file = joinpath(dir,"deps/build.jl")
+    context = BinDeps.PackageContext(false,dir,pkg,{})
+    m = Module(:__anon__)
+    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
+    eval(m,body)
+	for d in context.deps
+		BinDeps.satisfy!(d,[method])
+	end
 end

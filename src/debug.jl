@@ -12,7 +12,12 @@ function debug(io,pkg::String)
         if !applicable(dep)
             println(io," (not applicable to this system)")
         else
-            println(io)
+            lib = _find_library(dep)
+            if !isempty(lib)
+                println(io," (satisfied by $lib)")
+            else
+                println(io)
+            end
             if length(dep.providers) > 0
                 println(io,"    - Providers:")
                 for (dep,opts) in dep.providers 
