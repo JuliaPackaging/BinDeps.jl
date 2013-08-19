@@ -465,8 +465,8 @@ module BinDeps
 
     function cacheHomebrewPackages()
         empty!(installed_homebrew_packages)
-        for pkg in EachLine(read_from(`brew list`)[1])
-            add!(installed_homebrew_packages,chomp(pkg))
+        for pkg in EachLine(readsfrom(`brew list`)[1])
+            push!(installed_homebrew_packages,chomp(pkg))
         end
         installed_homebrew_packages
     end
@@ -483,7 +483,7 @@ module BinDeps
         if(isempty(installed_homebrew_packages))
             cacheHomebrewPackages()
         end
-        if(has(installed_homebrew_packages,x.name))
+        if(contains(installed_homebrew_packages,x.name))
             info("Package already installed")
         else
             run(`brew install $(x.desired_options) $(x.name)`)
