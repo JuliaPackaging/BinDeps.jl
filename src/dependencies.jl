@@ -351,12 +351,22 @@ if OS_NAME == :Darwin
 elseif OS_NAME == :Linux
 	defaults = [PackageManager,BuildProcess]
 elseif OS_NAME == :Windows
-	defaults = [Binaries]
+	defaults = [Binaries,PackageManager]
 else
 	defaults = [BuildProcess]
 end
 
-applicable(dep) = !haskey(dep.properties,:os) || (dep.properties[:os] == OS_NAME || (dep.properties[:os] == :Unix && Base.is_unix(OS_NAME)))
+function applicable(dep) 
+	if haskey(dep.properties,:os) 
+		if dep.properties[:os] != OS_NAME || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
+			return false
+		end
+	elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
+		return false
+	end
+	return true
+end
+
 function can_provide(p,opts,dep)
 	if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
 		return false
