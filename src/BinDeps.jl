@@ -45,9 +45,13 @@ module BinDeps
         global downloadcmd
         if downloadcmd === nothing
             for checkcmd in (:curl, :wget, :fetch)
-                if success(`$checkcmd --help`)
-                    downloadcmd = checkcmd
-                    break
+                try
+                    if success(`$checkcmd --help`)
+                        downloadcmd = checkcmd
+                        break
+                    end
+                catch
+                    continue # don't bail if one of these fails
                 end
             end
         end
