@@ -264,7 +264,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	merge!(opts,h.opts)
 	if haskey(opts,:installed_libname)
 		!haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
-		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),delete!(opts,:installed_libname))]
+		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),pop!(opts,:installed_libname))]
 	elseif !haskey(opts,:installed_libpath)
 		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*shlib_ext for x in get(dep.properties,:aliases,ByteString[])]
 	end
@@ -281,7 +281,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 		opts[:rpath_dirs] = String[]
 	end
 	if haskey(opts,:configure_subdir)
-		opts[:srcdir] = joinpath(opts[:srcdir],delete!(opts,:configure_subdir))
+		opts[:srcdir] = joinpath(opts[:srcdir],pop!(opts,:configure_subdir))
 	end
 	unshift!(opts[:include_dirs],includedir(dep))
 	unshift!(opts[:lib_dirs],libdir(dep))
@@ -488,7 +488,7 @@ macro load_dependencies(args...)
 					found = (dep.name == string(need))
 					if found
 						sym = arg1[need]
-						delete!(arg1,need)
+						pop!(arg1,need)
 						break
 					end
 				end
