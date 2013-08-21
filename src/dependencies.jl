@@ -361,7 +361,7 @@ end
 
 # Default installation method
 if OS_NAME == :Darwin
-	defaults = [Binaries,BuildProcess]
+	defaults = [Binaries,PackageManager,BuildProcess]
 elseif OS_NAME == :Linux
 	defaults = [PackageManager,BuildProcess]
 elseif OS_NAME == :Windows
