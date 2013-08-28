@@ -78,15 +78,6 @@ export library_dependency, bindir, srcdir, usrdir, libdir
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
 
 abstract PackageManager <: DependencyProvider
-const has_homebrew = try success(`brew -v`) catch e false end
-
-type Homebrew <: PackageManager 
-	inst::HomebrewInstall
-end
-Homebrew(pkg::String) = Homebrew(HomebrewInstall(pkg,ASCIIString[]))
-can_use(::Type{Homebrew}) = has_homebrew && OS_NAME == :Darwin
-package_available(p::Homebrew) = can_use(Homebrew)
-pkg_name(a::Homebrew) = a.inst.name
 
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
@@ -160,7 +151,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
 
-export Homebrew, AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -190,13 +181,6 @@ end
 
 generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
 generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
-function generate_steps(dep::LibraryDependency,h::Homebrew,opts) 
-	if get(opts,:force_rebuild,false) 
-		error("Will not force Homebrew to rebuild dependency \"$(dep.name)\".\n"*
-			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
-	end
-	return h.inst
-end
 function generate_steps(dep::LibraryDependency,h::AptGet,opts) 
 	if get(opts,:force_rebuild,false) 
 		error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
