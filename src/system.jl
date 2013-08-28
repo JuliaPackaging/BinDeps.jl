@@ -82,6 +82,7 @@ function port(cmd::Symbol,arg=nothing)
     elseif cmd == :whatprovides
         return nothing
     elseif cmd == :install
+        print("System dependency install using `sudo`. You will be prompted to enter password.")
         return run(`sudo $port_path install $arg`)
     end
 end
@@ -110,6 +111,7 @@ function yum(cmd::Symbol,arg=nothing)
         #TODO: scan for package name(s)
         return nothing
     elseif cmd == :install
+        print("System dependency install using `sudo`. You will be prompted to enter password.")
         return run(`sudo yum install $arg`)
     end
 end
@@ -120,6 +122,7 @@ function apt(cmd::Symbol,arg=nothing)
     elseif cmd == :whatprovides
         return unique([split(pkg,":",2) for pkg in split(readall("apt-file search $arg"),'\n')])
     elseif cmd == :install
+        print("System dependency install using `sudo`. You will be prompted to enter password.")
         return run("sudo apt-get install $arg")
     end
 end
