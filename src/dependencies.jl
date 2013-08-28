@@ -317,17 +317,17 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 end
 
 function _find_library(dep::LibraryDependency)
-	# Same as find_library, but with extra check defined by dep
-	libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
-	# Make sure we keep the defaults first, but also look in the other directories
-	providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
+    # Same as find_library, but with extra check defined by dep
+    libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
+    # Make sure we keep the defaults first, but also look in the other directories
+    providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
     for (p,opts) in providers
-    	(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-    	paths = String[]
-    	push!(paths,libdir(p,dep))
-    	# Windows, do you know what `lib` stands for???
-    	@windows_only push!(paths,bindir(p,dep))
-    	(isempty(paths) || all(map(isempty,paths))) && continue
+        (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
+        paths = String[]
+        push!(paths,libdir(p,dep))
+        # Windows, do you know what `lib` stands for???
+        @windows_only push!(paths,bindir(p,dep))
+        (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
             p = dlopen_e(l, RTLD_LAZY)
@@ -335,12 +335,12 @@ function _find_library(dep::LibraryDependency)
             	works = dep.libvalidate(l,p)
                 dlclose(p)
                 if works
-                	return l
+                    return l
                 else
-                	# We tried to load this providers' library, but it didn't satisfy
-                	# the requirements, so tell it to force a rebuild since the requirements
-                	# have most likely changed
-                	opts[:force_rebuild] = true
+                    # We tried to load this providers' library, but it didn't satisfy
+                    # the requirements, so tell it to force a rebuild since the requirements
+                    # have most likely changed
+                    opts[:force_rebuild] = true
                 end
             end
         end
@@ -372,7 +372,7 @@ end
 
 function applicable(dep) 
 	if haskey(dep.properties,:os) 
-		if dep.properties[:os] != OS_NAME || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
+		if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
 			return false
 		end
 	elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false

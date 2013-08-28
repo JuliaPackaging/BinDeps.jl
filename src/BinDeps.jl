@@ -274,7 +274,7 @@ module BinDeps
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
     function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection) 
     	if(a.cwd==b.cwd)
-    		append!(a.steps,b.steps)
+  		append!(a.steps,b.steps)
     	else
     		push!(a.steps,b)
     	end
@@ -335,9 +335,9 @@ module BinDeps
         if(!isempty(a.targets))
             cmd = `$cmd $(a.targets)`
         end
-        @dependent_steps ( cmd, )
+        @dependent_steps ( setenv(cmd, a.env), )
     end
-    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( `make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, )
+    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, a.env), )
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
     lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
