@@ -170,7 +170,3 @@ function run(si::SystemLibInstall)
     return man(:install, provides)
 end
 
-function HomebrewInstall(name,desired_options)
-    Base.warn_once("HomebrewInstall is deprecated, use SystemLibInstall instead.")
-    return SystemLibInstall(name, [("brew",`$desired_options $name`)])
-end

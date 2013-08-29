@@ -2,10 +2,9 @@ module BinDeps
     importall Base
 
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
-            HomebrewInstall, Choice, Choices, CCompile,
-            FileDownloader, FileRule, ChangeDirectory, FileDownloader,
-            FileUnpacker, prepare_src, autotools_install,
-            CreateDirectory, MakeTargets, SystemLibInstall
+            Choice, Choices, CCompile, FileDownloader, FileRule,
+            ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
+            autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
     import Base.Sys.shlib_ext
 
     function find_library(pkg,libname,files)
@@ -464,36 +463,6 @@ module BinDeps
     autotools_install(depsdir,url, downloaded_file, configure_opts, directory, libname)=autotools_install(depsdir,url,downloaded_file,configure_opts,directory,directory,libname,libname)
 
     autotools_install(args...) = error("autotools_install has been removed")
-
-    const installed_homebrew_packages = Set{ASCIIString}()
-
-    function cacheHomebrewPackages()
-        empty!(installed_homebrew_packages)
-        for pkg in EachLine(read_from(`brew list`)[1])
-            add!(installed_homebrew_packages,chomp(pkg))
-        end
-        installed_homebrew_packages
-    end
-
-    type HomebrewInstall <: BuildStep
-        name::ASCIIString
-        desired_options::Vector{ASCIIString}
-        required_options::Vector{ASCIIString}
-        HomebrewInstall(name,desired_options) = new(name,desired_options,ASCIIString[])
-        HomebrewInstall(name,desired_options,required_options) = error("required_options not implemented yet")
-    end
-
-    function run(x::HomebrewInstall)
-        if(isempty(installed_homebrew_packages))
-            cacheHomebrewPackages()
-        end
-        if(has(installed_homebrew_packages,x.name))
-            info("Package already installed")
-        else
-            run(`brew install $(x.desired_options) $(x.name)`)
-        end
-        cacheHomebrewPackages()
-    end
 
     include("dependencies.jl")
     include("debug.jl")
