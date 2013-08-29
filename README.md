@@ -147,15 +147,11 @@ defined the following dependencies:
 	baz = library_dependency("libbaz")
 ```
 
-And let's suppose that these libraries are available in the `foo` and `baz` 
-packages in Homebrew, the `libfoo-dev` and `libbaz-dev` in apt-get and that both 
-libraries are installed by the `libbaz` yum package. We may declare this as follows:
+And let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
+in apt-get and that both libraries are installed by the `libbaz` yum package. We may
+declare this as follows:
 
 ```julia
-	provides(Homebrew,{
-		"foo" => foo,
-		"baz" => baz
-	}
 	provides(AptGet,{
 		"libfoo-dev" => foo,
 		"libbaz-dev" => baz,
@@ -164,7 +160,7 @@ libraries are installed by the `libbaz` yum package. We may declare this as foll
 }
 ```
 
-One may remember the `provides` function by thinking `Homebrew` `provides` the dependencies `foo` and `baz`. 
+One may remember the `provides` function by thinking `AptGet` `provides` the dependencies `foo` and `baz`. 
 
 The basic signature of the provides function is
 ```julia
@@ -196,7 +192,7 @@ There are also several builtin options. Some of them are:
 
 # The high level interface - built in providers
 
-We have already seen the `Homebrew`, `Cairo` and `Yum` providers, which all take a string naming the package as their data argument. The other build-in providers are:
+We have already seen the `AptGet`, and `Yum` providers, which all take a string naming the package as their data argument. The other build-in providers are:
 
  * Sources
 
