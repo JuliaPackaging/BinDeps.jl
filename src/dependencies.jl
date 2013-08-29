@@ -250,7 +250,6 @@ function generate_steps(dep::LibraryDependency,method)
 end
 
 function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
-	dump(dep.providers)
 	if is(h.source, nothing) 
 		h.source = gethelper(dep,Sources)
 	end
@@ -345,7 +344,7 @@ end
 
 # Default installation method
 if OS_NAME == :Darwin
-	defaults = [Binaries,BuildProcess]
+	defaults = [Binaries,PackageManager,BuildProcess]
 elseif OS_NAME == :Linux
 	defaults = [PackageManager,BuildProcess]
 elseif OS_NAME == :Windows
