@@ -186,7 +186,10 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
 		error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
 			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
-	`sudo apt-get install $(h.package)`
+	@build_steps begin
+		`sudo apt-get install $(h.package)`
+		()->(ccall(:read_sonames,Void,()))
+	end
 end
 function generate_steps(dep::LibraryDependency,h::Yum,opts) 
 	if get(opts,:force_rebuild,false) 
