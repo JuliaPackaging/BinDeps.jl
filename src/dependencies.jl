@@ -188,7 +188,7 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
 	end
 	@build_steps begin
 		`sudo apt-get install $(h.package)`
-		()->(ccall(:read_sonames,Void,()))
+		()->(ccall(:jl_read_sonames,Void,()))
 	end
 end
 function generate_steps(dep::LibraryDependency,h::Yum,opts) 
