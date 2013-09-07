@@ -97,7 +97,7 @@ pkg_name(a::AptGet) = a.package
 
 libdir(p::AptGet,dep) = "/usr/lib"
 
-const has_yum = try success(`yum -v`) catch e false end
+const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
 	package::String
 end
