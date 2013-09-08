@@ -50,7 +50,7 @@ function brew(cmd::Symbol,arg=nothing)
         brew_path = hasbin("brew",["/usr/local/bin",])
         if brew_path != ""
             brewlib = abspath(brew_path,"..","lib")
-            if !contains(LIBRARY_PATH, brewlib)
+            if !(brewlib in LIBRARY_PATH)
                 push!(Sys.DL_LOAD_PATH, brewlib)
                 add_to_juliarc("push!(Sys.DL_LOAD_PATH, \"$(escape(brewlib))\")")
             end
@@ -72,7 +72,7 @@ function port(cmd::Symbol,arg=nothing)
         port_path = hasbin("port",["/opt/local/bin",])
         if port_path != ""
             portlib = abspath(port_path,"..","lib")
-            if !contains(LIBRARY_PATH, portlib)
+            if !(portlib in LIBRARY_PATH)
                 push!(Sys.DL_LOAD_PATH, portlib)
                 add_to_juliarc("push!(Sys.DL_LOAD_PATH, \"$(escape(portlib))\")")
             end
