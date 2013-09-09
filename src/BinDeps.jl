@@ -133,11 +133,11 @@ module BinDeps
     type MakeTargets <: BuildStep
     	dir::String
     	targets::Vector{ASCIIString}
-        env
-    	MakeTargets(dir,target;env = ByteString[]) = new(dir,target,env)
-    	MakeTargets(target::Vector{ASCIIString};env = ByteString[]) = new("",target,env)
-    	MakeTargets(target::ASCIIString;env = ByteString[]) = new("",[target],env)
-    	MakeTargets(;env = ByteString[]) = new("",ASCIIString[],env)
+        env::Dict
+    	MakeTargets(dir,target;env = (String=>String)[]) = new(dir,target,env)
+    	MakeTargets(target::Vector{ASCIIString};env = (String=>String)[]) = new("",target,env)
+    	MakeTargets(target::ASCIIString;env = (String=>String)[]) = new("",[target],env)
+    	MakeTargets(;env = (String=>String)[]) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -326,6 +326,14 @@ module BinDeps
             DirectoryRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
         end
     end
+
+    function adjust_env(env) 
+        ret = similar(env)
+        merge!(ret,ENV)
+        merge!(ret,env) #s.env overrides ENV 
+        ret
+    end
+
     @unix_only function lower(a::MakeTargets,collection) 
         cmd = `make -j8`
         if(!isempty(a.dir))
@@ -334,9 +342,9 @@ module BinDeps
         if(!isempty(a.targets))
             cmd = `$cmd $(a.targets)`
         end
-        @dependent_steps ( setenv(cmd, a.env), )
+        @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
-    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, a.env), )
+    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), )
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
     lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -347,9 +355,8 @@ module BinDeps
     	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
     	@unix_only prefix = s.prefix
     	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
-        env = similar(s.env)
-        merge!(env,ENV)
-        merge!(env,s.env) #s.env overrides ENV
+
+        env = adjust_env(s.env)
 
         for path in s.include_dirs
             if !haskey(env,"CPPFLAGS")
@@ -383,7 +390,7 @@ module BinDeps
             begin
                 ChangeDirectory(s.builddir)
                 @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
-                FileRule(s.libtarget,MakeTargets(;env=env))
+                FileRule(s.libtarget,MakeTargets(;env=s.env))
                 MakeTargets("install";env=env)
             end
         end
