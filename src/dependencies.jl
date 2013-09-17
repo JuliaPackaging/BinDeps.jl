@@ -102,6 +102,25 @@ type Yum <: PackageManager
 	package::String
 end
 can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
+package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
+function available_version(y::Yum)
+	uname = readchomp(`uname -m`)
+	found_uname = false
+	found_version = false
+	for l in eachline(`yum info $(y.package)`)
+		l = chomp(l)
+		if !found_uname
+			# On 64-bit systems, we may have multiple arches installed
+			# this makes sure we get the right one
+			found_uname = endswith(l, uname)
+			continue
+		end
+		if beginswith(l, "Version")
+			return convert(VersionNumber, split(l)[end])
+		end
+	end
+	error("yum did not return version information.  This shouldn't happen. Please file a bug!")
+end
 pkg_name(y::Yum) = y.package
 
 # Can use everything else without restriction by default
