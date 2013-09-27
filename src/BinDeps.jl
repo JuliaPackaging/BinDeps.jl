@@ -290,11 +290,11 @@ module BinDeps
         file::Array{String}
         step
         FileRule(file::String,step) = FileRule(String[file],step)
-        FileRule{T<:String}(files::Vector{T},step) = FileRule(String[f for f in files],step)
     	function FileRule(files::Vector{String},step) 
-    		f=new(files,@build_steps (step,) )
+            new(files,@build_steps (step,) )
     	end
     end
+    FileRule{T<:String}(files::Vector{T},step) = FileRule(String[f for f in files],step)
 
     function lower(s::ChangeDirectory,collection)
         if(!isempty(collection.steps))
