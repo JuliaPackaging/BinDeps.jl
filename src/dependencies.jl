@@ -427,7 +427,7 @@ function satisfy!(dep::LibraryDependency, methods = defaults)
 				can_provide(p,opts,dep) || continue
 				if haskey(opts,:force_depends)
 					for (dmethod,ddep) in opts[:force_depends]
-						(dp,dopts) = getprovider(ddep,dmethod)
+						(dp,dopts) = getallproviders(ddep,dmethod)[1]
 						run(lower(generate_steps(ddep,dp,dopts)))
 					end
 				end
