@@ -1,6 +1,6 @@
 function debug(io,pkg::String)
     info("Reading build script...")
-    dir = Pkg2.dir(pkg)
+    dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
     context = BinDeps.PackageContext(false,dir,pkg,{})
     m = Module(:__anon__)
