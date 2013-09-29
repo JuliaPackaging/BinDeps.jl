@@ -498,7 +498,7 @@ macro load_dependencies(args...)
     	error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
     end
 	pkg = ""
-	r = search(dir,Pkg2.Dir.path())
+	r = search(dir,Pkg.Dir.path())
 	if r != 0:-1
 		s = search(dir,"/",last(r)+2)
 		if s != 0:-1
@@ -554,7 +554,7 @@ macro load_dependencies(args...)
 		end
 		s = symbol(sym)
 		errorcase = Expr(:block)
-		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg2.fixup() to install missing dependencies!")))
+		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.fixup() to install missing dependencies!")))
 		push!(ret.args,quote
 			const $(esc(s)) = BinDeps._find_library($dep)
 			if isempty($(esc(s)))
@@ -575,7 +575,7 @@ macro load_dependencies(args...)
 end
 
 function build(pkg::String, method; dep::String="", force=false)
-    dir = Pkg2.dir(pkg)
+    dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
     context = BinDeps.PackageContext(false,dir,pkg,{})
     m = Module(:__anon__)
