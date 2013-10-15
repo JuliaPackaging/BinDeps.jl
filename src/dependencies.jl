@@ -554,7 +554,7 @@ macro load_dependencies(args...)
 		end
 		s = symbol(sym)
 		errorcase = Expr(:block)
-		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.fixup() to install missing dependencies!")))
+		push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.build() to install missing dependencies!")))
 		push!(ret.args,quote
 			const $(esc(s)) = BinDeps._find_library($dep)
 			if isempty($(esc(s)))
