@@ -8,7 +8,7 @@ module BinDeps
     import Base.Sys.shlib_ext
 
     function find_library(pkg,libname,files)
-        Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead."; depth=1)
+        Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
         dl = C_NULL
         for filename in files
             dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
