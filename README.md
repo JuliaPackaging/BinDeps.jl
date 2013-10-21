@@ -40,9 +40,9 @@ the actual package, I want to answer a few common questions:
     recommend?
 
     The easiest way to do this is probably just to declare a 
-    `BuildProceess` for all your declared dependencies. This way, your 
+    `BuildProcess` for all your declared dependencies. This way, your 
     custom build process will be called whenever there is an unsatisfied
-    library dependency and you my still use the BinDeps runtime 
+    library dependency and you may still use the BinDeps runtime 
     features.
 
   * Is there anything I should keep in mind when extending BinDeps or 
@@ -89,18 +89,17 @@ is the name of the library, so the following would be an entirely valid call:
 However, you'll most likely quickly run into the issue that this library is named differently on different systems, which is 
 why BinDeps provides the handy `aliases` keyword argument. So suppose our library is sometimes known as `libfoo.so`, but 
 other times as `libfoo-1.so` or `libfoo-1.0.0.dylib` or even `libbar.dll` on windows, because the authors of the library 
-decided to punish windows uses. In either case, we can easily declare all these in our library dependency:
+decided to punish windows users. In either case, we can easily declare all these in our library dependency:
 
 ```julia
 	foo = library_dependency("libfoo",aliases=["libfoo","libfoo-1","libfoo-1.0.0","libbar"])
 ```
 
 So far so good!
-There are a couple of other keyword arguments that are currently implemented and many more will most likely be added as 
-necessary. The ones that are currently used are:
+There are a couple of other keyword arguments that are currently implemented:
 
  * `os = OS_NAME`
- 	Limits this dependency to certain operating systems. The same could be achieved by using the operating specific macro, but
+ 	Limits this dependency to certain operating systems. The same could be achieved by using the OS-specific macro, but
  	this setting applies to all uses of this dependency and avoids having to wrap all uses of this dependency in macros.
  	Note that the `os` parameter must match the value of `Base.OS_NAME` on the target platform with the special exception that
  	`:Unix` matches all Unix-like platforms (e.g. `Linux`, `Mac OS X`, `FreeBSD`)
@@ -118,9 +117,9 @@ necessary. The ones that are currently used are:
 ```
 
  * `runtime::Bool`
- 	Whether or not to consider this a runtime dependency. This means it's absence 
+ 	Whether or not to consider this a runtime dependency. If false, its absence 
  	will not trigger an error at runtime (and it will not be loaded), but if it
- 	cannot be found at buildtime it will be installed (useful for build-time) 
+ 	cannot be found at buildtime it will be installed. This is useful for build-time 
  	dependencies of other binary dependencies. 
  
  * `validate::Function`
@@ -134,12 +133,13 @@ necessary. The ones that are currently used are:
  	Should the validation return false for a library that was installed by a provider, the 
  	provider will be instructed to force a rebuild.
 
+Other keyword arguments will most likely be added as necessary.
 
 # The high level interface - Declaring build mechanisms
 
 Alright, now that we have declared all the dependencies that we
 need let's tell BinDeps how to build them. One of the easiest ways 
-to do so it to use the system package manger. So suppose we have 
+to do so is to use the system package manger. So suppose we have 
 defined the following dependencies:
 
 ```julia
@@ -147,7 +147,7 @@ defined the following dependencies:
 	baz = library_dependency("libbaz")
 ```
 
-And let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
+Let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
 in apt-get and that both libraries are installed by the `libbaz` yum package. We may
 declare this as follows:
 
