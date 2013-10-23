@@ -442,37 +442,47 @@ end
 
 execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
 
-macro install (_libmaps)
-    libmaps = eval(_libmaps)
-    load_cache = gensym()
-    ret = Expr(:block)
-    push!(ret.args,
-        esc(quote
-                load_cache = Dict()
-                if bindeps_context.do_install
-                    for d in bindeps_context.deps
-                        BinDeps.satisfy!(d)
-                        lib = BinDeps._find_library(d)
-                        if lib != ""
-                            load_cache[d.name] = lib
+macro install (_libmaps...)
+    if length(_libmaps) == 0
+        return esc(quote
+            if bindeps_context.do_install
+                for d in bindeps_context.deps
+                    BinDeps.satisfy!(d)
+                end
+            end  
+        end)
+    else
+        libmaps = eval(_libmaps[1])
+        load_cache = gensym()
+        ret = Expr(:block)
+        push!(ret.args,
+            esc(quote
+                    load_cache = Dict()
+                    if bindeps_context.do_install
+                        for d in bindeps_context.deps
+                            BinDeps.satisfy!(d)
+                            lib = BinDeps._find_library(d)
+                            if lib != ""
+                                load_cache[d.name] = lib
+                            end
                         end
                     end
-                end
-                depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
-                println(depsfile, "macro checked_lib(libname, path)
-    (dlopen_e(path) == C_NULL) && error(\"Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.\")
-    quote const \$(esc(libname)) = \$path end
-end")
-                for libkey in keys($libmaps)
-                    ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
-                    println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
-                end
-                close(depsfile)
-            end))
-    if !(typeof(libmaps) <: Associative)
-        warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
+                    depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
+                    println(depsfile, "macro checked_lib(libname, path)
+        (dlopen_e(path) == C_NULL) && error(\"Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.\")
+        quote const \$(esc(libname)) = \$path end
+    end")
+                    for libkey in keys($libmaps)
+                        ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
+                        println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
+                    end
+                    close(depsfile)
+                end))
+        if !(typeof(libmaps) <: Associative)
+            warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
+        end
+        ret
     end
-    ret
 end
 
 # Usage: @load_dependencies [file] [filter]
