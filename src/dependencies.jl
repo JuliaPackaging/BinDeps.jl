@@ -287,10 +287,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),opts[:installed_libname])]
 		delete!(opts, :installed_libname)
 	elseif !haskey(opts,:installed_libpath)
-		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*shlib_ext for x in get(dep.properties,:aliases,ByteString[])]
+		opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in get(dep.properties,:aliases,ByteString[])]
 	end
 	if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
-		opts[:libtarget] = ByteString[x*"."*shlib_ext for x in dep.properties[:aliases]]
+		opts[:libtarget] = ByteString[x*"."*dlext for x in dep.properties[:aliases]]
 	end
 	if !haskey(opts,:include_dirs)
 		opts[:include_dirs] = String[]

@@ -5,7 +5,7 @@ module BinDeps
             Choice, Choices, CCompile, FileDownloader, FileRule,
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
             autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
-    import Base.Sys.shlib_ext
+    import Base.Sys.dlext
 
     function find_library(pkg,libname,files)
         Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
