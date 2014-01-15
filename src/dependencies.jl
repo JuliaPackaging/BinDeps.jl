@@ -206,6 +206,7 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
 			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
 	@build_steps begin
+		println("Installing dependency $(h.package) via `sudo apt-get install $(h.package)`:")
 		`sudo apt-get install $(h.package)`
 		()->(ccall(:jl_read_sonames,Void,()))
 	end
@@ -215,7 +216,12 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
 		error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
 		  	  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
-	`sudo yum install $(h.package)`
+	
+	@build_steps begin
+		println("Installing dependency $(h.package) via `sudo yum install $(h.package)`:")
+		`sudo yum install $(h.package)`
+		()->(ccall(:jl_read_sonames,Void,()))
+	end
 end
 function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
