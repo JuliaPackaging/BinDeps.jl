@@ -5,7 +5,9 @@ module BinDeps
             Choice, Choices, CCompile, FileDownloader, FileRule,
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
             autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
-    import Base.Sys.dlext
+
+    const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
+    const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
     function find_library(pkg,libname,files)
         Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
