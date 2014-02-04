@@ -336,6 +336,16 @@ function _find_library(dep::LibraryDependency)
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = String[]
         push!(paths,libdir(p,dep))
+
+        # Many linux distributions use lib33/lib64 as well
+        @unix_only begin
+        	if isdir(libdir(p,dep)*"32")
+        		push!(paths, libdir(p,dep)*"32")
+        	end
+        	if isdir(libdir(p,dep)*"64")
+        		push!(paths, libdir(p,dep)*"64")
+        	end
+    	end
         # Windows, do you know what `lib` stands for???
         @windows_only push!(paths,bindir(p,dep))
         (isempty(paths) || all(map(isempty,paths))) && continue
