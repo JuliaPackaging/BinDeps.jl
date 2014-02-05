@@ -337,7 +337,7 @@ function _find_library(dep::LibraryDependency)
         paths = String[]
         push!(paths,libdir(p,dep))
 
-        # Many linux distributions use lib33/lib64 as well
+        # Many linux distributions use lib32/lib64 as well
         @unix_only begin
         	if isdir(libdir(p,dep)*"32")
         		push!(paths, libdir(p,dep)*"32")
