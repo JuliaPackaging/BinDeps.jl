@@ -236,7 +236,7 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
 	localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
 	steps = @build_steps begin
 		FileDownloader(string(h.uri),localfile)
-		FileUnpacker(localfile,depsdir(dep),"usr")
+		FileUnpacker(localfile,depsdir(dep),get(opts,:unpacked_dir,"usr"))
 	end
 end
 generate_steps(dep::LibraryDependency,h::SimpleBuild,opts) = h.steps
@@ -336,6 +336,9 @@ function _find_library(dep::LibraryDependency)
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = String[]
         push!(paths,libdir(p,dep))
+        if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
+            push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
+        end
 
         # Many linux distributions use lib32/lib64 as well
         @unix_only begin
