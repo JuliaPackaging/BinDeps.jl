@@ -1,0 +1,9 @@
+touch config.status
+cat <<EOF > Makefile
+all: liba.dylib
+liba.dylib:
+	clang -shared ../../src/liba/liba.c -o liba.dylib
+install: liba.dylib
+	mkdir -p ../../usr/lib
+	cp liba.dylib ../../usr/lib
+EOF
