@@ -20,8 +20,11 @@ function debug(io,pkg::String)
             end
             if length(dep.providers) > 0
                 println(io,"    - Providers:")
-                for (dep,opts) in dep.providers 
-                    show_indented(io,dep,6)
+                for (p,opts) in dep.providers
+                    show_indented(io,p,6)
+                    if !can_provide(p,opts,dep)
+                        print(io," (can't provide)")
+                    end
                     println(io)
                 end
             end
