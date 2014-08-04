@@ -214,7 +214,7 @@ end
 function generate_steps(dep::LibraryDependency,h::Yum,opts) 
 	if get(opts,:force_rebuild,false) 
 		error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
-		  	  "Please make any necessary adjustments manually (This might just be a version upgrade)")
+			  "Please make any necessary adjustments manually (This might just be a version upgrade)")
 	end
 	
 	@build_steps begin
@@ -304,9 +304,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	if !haskey(opts,:lib_dirs)
 		opts[:lib_dirs] = String[]
 	end
-    if !haskey(opts,:pkg_config_dirs)
-        opts[:pkg_config_dirs] = String[]
-    end
+	if !haskey(opts,:pkg_config_dirs)
+		opts[:pkg_config_dirs] = String[]
+	end
 	if !haskey(opts,:rpath_dirs)
 		opts[:rpath_dirs] = String[]
 	end
@@ -317,10 +317,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	unshift!(opts[:include_dirs],includedir(dep))
 	unshift!(opts[:lib_dirs],libdir(dep))
 	unshift!(opts[:rpath_dirs],libdir(dep))
-    unshift!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
+	unshift!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
 	env = Dict{ByteString,ByteString}()
 	env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
-    delete!(opts,:pkg_config_dirs)
+	delete!(opts,:pkg_config_dirs)
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
 	haskey(opts,:env) && merge!(env,opts[:env])
@@ -333,59 +333,59 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 end
 
 function _find_library(dep::LibraryDependency)
-    # Same as find_library, but with extra check defined by dep
-    libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
-    # Make sure we keep the defaults first, but also look in the other directories
-    providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
-    for (p,opts) in providers
-        (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-        paths = String[]
-        push!(paths,libdir(p,dep))
-        if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
-            push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
-        end
+	# Same as find_library, but with extra check defined by dep
+	libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
+	# Make sure we keep the defaults first, but also look in the other directories
+	providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
+	for (p,opts) in providers
+		(p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
+		paths = String[]
+		push!(paths,libdir(p,dep))
+		if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
+			push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
+		end
 
-        # Many linux distributions use lib32/lib64 as well
-        @unix_only begin
-        	if isdir(libdir(p,dep)*"32")
-        		push!(paths, libdir(p,dep)*"32")
-        	end
-        	if isdir(libdir(p,dep)*"64")
-        		push!(paths, libdir(p,dep)*"64")
-        	end
-    	end
-        # Windows, do you know what `lib` stands for???
-        @windows_only push!(paths,bindir(p,dep))
-        (isempty(paths) || all(map(isempty,paths))) && continue
-        for lib in libnames, path in paths
-            l = joinpath(path, lib)
-            p = dlopen_e(l, RTLD_LAZY)
-            if p != C_NULL
-            	works = dep.libvalidate(l,p)
-                dlclose(p)
-                if works
-                    return l
-                else
-                    # We tried to load this providers' library, but it didn't satisfy
-                    # the requirements, so tell it to force a rebuild since the requirements
-                    # have most likely changed
-                    opts[:force_rebuild] = true
-                end
-            end
-        end
-    end
-    # Now check system libraries
-    for lib in libnames
-        p = dlopen_e(lib, RTLD_LAZY)
-        if p != C_NULL 
-        	works = dep.libvalidate(lib,p)
-            dlclose(p)
-            if works
-            	return lib
-            end
-        end
-    end
-    return ""
+		# Many linux distributions use lib32/lib64 as well
+		@unix_only begin
+			if isdir(libdir(p,dep)*"32")
+				push!(paths, libdir(p,dep)*"32")
+			end
+			if isdir(libdir(p,dep)*"64")
+				push!(paths, libdir(p,dep)*"64")
+			end
+		end
+		# Windows, do you know what `lib` stands for???
+		@windows_only push!(paths,bindir(p,dep))
+		(isempty(paths) || all(map(isempty,paths))) && continue
+		for lib in libnames, path in paths
+			l = joinpath(path, lib)
+			p = dlopen_e(l, RTLD_LAZY)
+			if p != C_NULL
+				works = dep.libvalidate(l,p)
+				dlclose(p)
+				if works
+					return l
+				else
+					# We tried to load this providers' library, but it didn't satisfy
+					# the requirements, so tell it to force a rebuild since the requirements
+					# have most likely changed
+					opts[:force_rebuild] = true
+				end
+			end
+		end
+	end
+	# Now check system libraries
+	for lib in libnames
+		p = dlopen_e(lib, RTLD_LAZY)
+		if p != C_NULL 
+			works = dep.libvalidate(lib,p)
+			dlclose(p)
+			if works
+				return lib
+			end
+		end
+	end
+	return ""
 end
 
 # Default installation method
@@ -467,46 +467,46 @@ end
 execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
 
 macro install (_libmaps...)
-    if length(_libmaps) == 0
-        return esc(quote
-            if bindeps_context.do_install
-                for d in bindeps_context.deps
-                    BinDeps.satisfy!(d)
-                end
-            end  
-        end)
-    else
-        libmaps = eval(_libmaps[1])
-        load_cache = gensym()
-        ret = Expr(:block)
-        push!(ret.args,
-            esc(quote
-                    load_cache = Dict()
-                    if bindeps_context.do_install
-                        for d in bindeps_context.deps
-                            BinDeps.satisfy!(d)
-                            lib = BinDeps._find_library(d)
-                            if lib != ""
-                                load_cache[d.name] = lib
-                            end
-                        end
-                    end
-                    depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
-                    println(depsfile, "macro checked_lib(libname, path)
-        (dlopen_e(path) == C_NULL) && error(\"Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.\")
-        quote const \$(esc(libname)) = \$path end
-    end")
-                    for libkey in keys($libmaps)
-                        ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
-                        println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
-                    end
-                    close(depsfile)
-                end))
-        if !(typeof(libmaps) <: Associative)
-            warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
-        end
-        ret
-    end
+	if length(_libmaps) == 0
+		return esc(quote
+			if bindeps_context.do_install
+				for d in bindeps_context.deps
+					BinDeps.satisfy!(d)
+				end
+			end  
+		end)
+	else
+		libmaps = eval(_libmaps[1])
+		load_cache = gensym()
+		ret = Expr(:block)
+		push!(ret.args,
+			esc(quote
+					load_cache = Dict()
+					if bindeps_context.do_install
+						for d in bindeps_context.deps
+							BinDeps.satisfy!(d)
+							lib = BinDeps._find_library(d)
+							if lib != ""
+								load_cache[d.name] = lib
+							end
+						end
+					end
+					depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
+					println(depsfile, "macro checked_lib(libname, path)
+		(dlopen_e(path) == C_NULL) && error(\"Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.\")
+		quote const \$(esc(libname)) = \$path end
+	end")
+					for libkey in keys($libmaps)
+						((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
+						println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
+					end
+					close(depsfile)
+				end))
+		if !(typeof(libmaps) <: Associative)
+			warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
+		end
+		ret
+	end
 end
 
 # Usage: @load_dependencies [file] [filter]
@@ -536,25 +536,25 @@ end
 #
 macro load_dependencies(args...)
 	dir = dirname(normpath(joinpath(dirname(Base.source_path()),"..")))
-    arg1 = nothing
-    file = "../deps/build.jl"
-    if length(args) == 1 
+	arg1 = nothing
+	file = "../deps/build.jl"
+	if length(args) == 1 
 		if isa(args[1],Expr)
-	    	arg1 = eval(args[1])
+			arg1 = eval(args[1])
 		elseif typeof(args[1]) <: String
-		    file = args[1]
-		    dir = dirname(normpath(joinpath(dirname(file),"..")))
-	    elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
-	    	arg1 = args[1]
-	    else
-	        error("Type $(typeof(args[1])) not recognized for argument 1. See usage instructions!")
+			file = args[1]
+			dir = dirname(normpath(joinpath(dirname(file),"..")))
+		elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
+			arg1 = args[1]
+		else
+			error("Type $(typeof(args[1])) not recognized for argument 1. See usage instructions!")
 		end
-    elseif length(args) == 2
-    	file = args[1]
-    	arg1 = typeof(args[2]) <: Associative || isa(args[2],Vector) ? args[2] : eval(args[2])
-    elseif length(args) != 0
-    	error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
-    end
+	elseif length(args) == 2
+		file = args[1]
+		arg1 = typeof(args[2]) <: Associative || isa(args[2],Vector) ? args[2] : eval(args[2])
+	elseif length(args) != 0
+		error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
+	end
 	pkg = ""
 	r = search(dir,Pkg.Dir.path())
 	if r != 0:-1
@@ -565,10 +565,10 @@ macro load_dependencies(args...)
 			pkg = dir[(last(r)+2):end]
 		end
 	end
-   	context = BinDeps.PackageContext(false,dir,pkg,{})
-    m = Module(:__anon__)
-    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
-    eval(m,body)
+	context = BinDeps.PackageContext(false,dir,pkg,{})
+	m = Module(:__anon__)
+	body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
+	eval(m,body)
 	ret = Expr(:block)
 	for dep in context.deps
 		if !applicable(dep)
@@ -633,12 +633,12 @@ macro load_dependencies(args...)
 end
 
 function build(pkg::String, method; dep::String="", force=false)
-    dir = Pkg.dir(pkg)
-    file = joinpath(dir,"deps/build.jl")
-    context = BinDeps.PackageContext(false,dir,pkg,{})
-    m = Module(:__anon__)
-    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
-    eval(m,body)
+	dir = Pkg.dir(pkg)
+	file = joinpath(dir,"deps/build.jl")
+	context = BinDeps.PackageContext(false,dir,pkg,{})
+	m = Module(:__anon__)
+	body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
+	eval(m,body)
 	for d in context.deps
 		BinDeps.satisfy!(d,[method])
 	end
