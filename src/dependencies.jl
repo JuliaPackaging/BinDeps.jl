@@ -3,7 +3,7 @@
 
 
 # A dependency provider, if succcessfully exectued will satisfy the dependency
-abstract DependencyProvider 
+abstract DependencyProvider
 
 # A library helper may be used by `DependencyProvider`s but will by iteself not provide the library
 abstract DependencyHelper
@@ -304,6 +304,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	if !haskey(opts,:lib_dirs)
 		opts[:lib_dirs] = String[]
 	end
+    if !haskey(opts,:pkg_config_dirs)
+        opts[:pkg_config_dirs] = String[]
+    end
 	if !haskey(opts,:rpath_dirs)
 		opts[:rpath_dirs] = String[]
 	end
@@ -314,8 +317,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
 	unshift!(opts[:include_dirs],includedir(dep))
 	unshift!(opts[:lib_dirs],libdir(dep))
 	unshift!(opts[:rpath_dirs],libdir(dep))
+    unshift!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
 	env = Dict{ByteString,ByteString}()
-	env["PKG_CONFIG_PATH"] = joinpath(libdir(dep),"pkgconfig")
+	env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
+    delete!(opts,:pkg_config_dirs)
 	@unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
 	@windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
 	haskey(opts,:env) && merge!(env,opts[:env])
