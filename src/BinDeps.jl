@@ -69,13 +69,15 @@ module BinDeps
 
     @unix_only begin
         function unpack_cmd(file,directory,extension,secondary_extension)
-            if(extension == ".gz" && secondary_extension == ".tar") || extension == ".tgz"
+            if (extension == ".gz" && secondary_extension == ".tar") || extension == ".tgz"
                 return (`tar xzf $file --directory=$directory`)
-            elseif(extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
+            elseif (extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
                 return (`tar xjf $file --directory=$directory`)
-            elseif(extension == ".xz" && secondary_extension == ".tar")
+            elseif extension == ".xz" && secondary_extension == ".tar"
                 return (`unxz -c $file `|>`tar xv --directory=$directory`)
-            elseif(extension == ".zip")
+            elseif extension == ".tar"
+                return (`tar xf $file --directory=$directory`)
+            elseif extension == ".zip"
                 return (`unzip -x $file -d $directory`)
             end
             error("I don't know how to unpack $file")
