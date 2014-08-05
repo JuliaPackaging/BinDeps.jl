@@ -703,7 +703,7 @@ macro install (_libmaps...)
                                 end
                             else
                                 for (k,v) in libs
-                                    load_cache[k.name] = v[2]
+                                    load_cache[d.name] = v
                                 end
                             end
                         end
