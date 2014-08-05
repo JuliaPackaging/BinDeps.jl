@@ -1,5 +1,6 @@
+print_indented(io::IO,x,indent) = print(io," "^indent,x)
 function show_indented(io::IO,x,indent)
-    print(io," "^indent,"- ")
+    print_indented(io,"- ",indent)
     show(io,x)
 end
 

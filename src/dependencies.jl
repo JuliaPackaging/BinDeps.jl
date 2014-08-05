@@ -22,6 +22,11 @@ type LibraryDependency
     libvalidate::Function
 end
 
+type LibraryGroup
+    name::String
+    deps::Vector{LibraryDependency}
+end
+
 import Base: show
 
 function show(io::IO, dep::LibraryDependency)
@@ -45,14 +50,28 @@ successful_validate(l,p) = true
 
 function _library_dependency(context::PackageContext, name; properties...)
     validate = successful_validate
+    group = nothing
     for i in 1:length(properties)
         k,v = properties[i]
         if k == :validate
             validate = v
             splice!(properties,i)
         end
+        if k == :group
+            group = v
+        end
     end
     r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),Array((DependencyHelper,Dict{Symbol,Any}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
+    if group !== nothing
+        push!(group.deps,r)
+    else
+        push!(context.deps,r)
+    end
+    r
+end
+
+function _library_group(context,name)
+    r = LibraryGroup(name,LibraryDependency[])
     push!(context.deps,r)
     r
 end
@@ -67,6 +86,7 @@ macro setup()
         else
             bindeps_context = BinDeps.PackageContext(true,$dir,$package,{})
         end
+        library_group(args...) = BinDeps._library_group(bindeps_context,args...)
         library_dependency(args...; properties...) = BinDeps._library_dependency(bindeps_context,args...;properties...)
     end)
 end
@@ -126,6 +146,15 @@ can_use(::Type) = true
 
 abstract Sources <: DependencyHelper
 abstract Binaries <: DependencyProvider
+
+#
+# A dummy provider checked for every library that
+# indicates the library was found somewhere on the
+# system using dlopen.
+#
+immutable SystemPaths <: Binaries; end
+
+show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
 using URIParser
 export URI
@@ -214,7 +243,7 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    
+
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo yum install $(h.package)`:")
         `sudo yum install $(h.package)`
@@ -326,11 +355,20 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     if get(provider_opts,:force_rebuild,false)
         opts[:force_rebuild] = true
     end
-    steps |= AutotoolsDependency(;opts...) 
+    steps |= AutotoolsDependency(;opts...)
     steps
 end
 
-function _find_library(dep::LibraryDependency)
+@osx_only const EXTENSIONS = ["","dylib"]
+@windows_only const EXTENSIONS = ["", "dll"]
+@linux_only const EXTENSIONS = ["","so"]
+
+#
+# Finds all copies of the library on the system, listed in preference order.
+# Return value is an array of tuples if the provider and the path where it is found
+#
+function _find_library(dep::LibraryDependency; provider = Any)
+    ret = Any[]
     # Same as find_library, but with extra check defined by dep
     libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
     # Make sure we keep the defaults first, but also look in the other directories
@@ -357,12 +395,13 @@ function _find_library(dep::LibraryDependency)
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
-            p = dlopen_e(l, RTLD_LAZY)
-            if p != C_NULL
-                works = dep.libvalidate(l,p)
-                dlclose(p)
+            h = dlopen_e(l, RTLD_LAZY)
+            if h != C_NULL
+                works = dep.libvalidate(l,h)
+                l = Sys.dlpath(h)
+                dlclose(h)
                 if works
-                    return l
+                    push!(ret, (p, l))
                 else
                     # We tried to load this providers' library, but it didn't satisfy
                     # the requirements, so tell it to force a rebuild since the requirements
@@ -374,16 +413,57 @@ function _find_library(dep::LibraryDependency)
     end
     # Now check system libraries
     for lib in libnames
-        p = dlopen_e(lib, RTLD_LAZY)
-        if p != C_NULL 
-            works = dep.libvalidate(lib,p)
-            dlclose(p)
-            if works
-                return lib
+        # We don't want to use regular dlopen, because we want to get at
+        # system libraries even if one of our providers is higher in the
+        # DL_LOAD_PATH
+        for path in Base.DL_LOAD_PATH
+            for ext in EXTENSIONS
+                opath = string(joinpath(path,lib),".",ext)
+                check_path!(ret,dep,opath)
             end
         end
+        for ext in EXTENSIONS
+            opath = string(lib,".",ext)
+            check_path!(ret,dep,opath)
+        end
     end
-    return ""
+    return ret
+end
+
+function check_path!(ret,dep,opath)
+    flags = RTLD_LAZY
+    handle = c_malloc(2*sizeof(Ptr{Void}))
+    err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
+    if err == 0
+        check_system_handle!(ret,dep,handle)
+        dlclose(handle)
+        c_free(handle)
+    end
+end
+
+function check_system_handle!(ret,dep,handle)
+    if handle != C_NULL
+        libpath = Sys.dlpath(handle)
+        # Check that this is not a duplicate
+        for p in ret
+            try
+                if realpath(p[2]) == realpath(libpath)
+                    return
+                end
+            catch
+                warn("""
+                    Found a library that does not exist.
+                    This may happen if the library has an active open handle.
+                    Please quit julia and try again.
+                    """)
+                return
+            end
+        end
+        works = dep.libvalidate(libpath,handle)
+        if works
+            push!(ret, (SystemPaths(), libpath))
+        end
+    end
 end
 
 # Default installation method
@@ -397,8 +477,8 @@ else
     defaults = [BuildProcess]
 end
 
-function applicable(dep) 
-    if haskey(dep.properties,:os) 
+function applicable(dep::LibraryDependency)
+    if haskey(dep.properties,:os)
         if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
             return false
         end
@@ -407,6 +487,8 @@ function applicable(dep)
     end
     return true
 end
+
+applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
     if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
@@ -437,29 +519,157 @@ function can_provide(p::PackageManager,opts,dep)
     end
 end
 
-issatisfied(dep) = _find_library(dep) != ""
+issatisfied(dep::LibraryDependency) = !isempty(_find_library(dep))
 
-function satisfy!(dep::LibraryDependency, methods = defaults)
-    if !issatisfied(dep) 
+allf(deps) = [dep => _find_library(dep) for dep in deps.deps]
+function satisfied_providers(deps::LibraryGroup, allfl = allf(deps))
+    viable_providers = nothing
+    for dep in deps.deps
         if !applicable(dep)
-            return
+            continue
         end
-        for method in methods
-            for (p,opts) in getallproviders(dep,method)
-                can_provide(p,opts,dep) || continue
-                if haskey(opts,:force_depends)
-                    for (dmethod,ddep) in opts[:force_depends]
-                        (dp,dopts) = getallproviders(ddep,dmethod)[1]
-                        run(lower(generate_steps(ddep,dp,dopts)))
-                    end
-                end
-                run(lower(generate_steps(dep,p,opts)))
-                !issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
-                return
+        providers = map(x->typeof(x[1]),allfl[dep])
+        if viable_providers == nothing
+            viable_providers = providers
+        else
+            viable_providers = intersect(viable_providers,providers)
+        end
+    end
+    viable_providers
+end
+
+function viable_providers(deps::LibraryGroup)
+    vp = nothing
+    for dep in deps.deps
+        if !applicable(dep)
+            continue
+        end
+        providers = map(x->typeof(x[1]),dep.providers)
+        if vp == nothing
+            vp = providers
+        else
+            vp = intersect(vp,providers)
+        end
+    end
+    vp
+end
+
+#
+# We need to make sure all libraries are satisfied with the
+# additional constraint that all of them are satisfied by the
+# same provider.
+#
+issatisfied(deps::LibraryGroup) = !isempty(satisfied_providers(deps))
+
+function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
+    providers = satisfied_providers(deps,allfl)
+    p = nothing
+    if isempty(providers)
+        return (Any=>Any)[]
+    else
+        for p2 in providers
+            if p2 <: provider
+                p = p2
             end
         end
-        error("None of the selected providers can install dependency $(dep.name)")
     end
+    p === nothing && error("Given provider does not satisfy the library group")
+    [dep => begin
+        thisfl = allfl[dep]
+        ret = nothing
+        for fl in thisfl
+            if isa(fl[1],p)
+                ret = fl
+                break
+            end
+        end
+        if ret == nothing
+            error("TEST")
+        end
+        ret
+    end for dep in filter(applicable,deps.deps)]
+end
+
+function satisfy!(deps::LibraryGroup, methods = defaults)
+    sp = satisfied_providers(deps)
+    if !isempty(sp)
+        for m in methods
+            for s in sp
+                if s <: m
+                    return s
+                end
+            end
+        end
+    end
+    if !applicable(deps)
+        return Any
+    end
+    vp = viable_providers(deps)
+    didsatisfy = false
+    for method in methods
+        for p in vp
+            if !(p <: method) || !can_use(p)
+                continue
+            end
+            skip = false
+            for dep in deps.deps
+                !applicable(dep) && continue
+                hasany = false
+                for (p2,opts) in getallproviders(dep,p)
+                    can_provide(p2, opts, dep) && (hasany = true)
+                end
+                if !hasany
+                    skip = true
+                    break
+                end
+            end
+            if skip
+                continue
+            end
+            for dep in deps.deps
+                satisfy!(dep,[p])
+            end
+            return p
+        end
+    end
+    error("""
+        None of the selected providers could satisfy library group $(deps.name)
+        Use BinDeps.debug(package_name) to see available providers
+        """)
+end
+
+function satisfy!(dep::LibraryDependency, methods = defaults)
+    sp = map(x->typeof(x[1]),_find_library(dep))
+    if !isempty(sp)
+        for m in methods
+            for s in sp
+                if s <: m
+                    return s
+                end
+            end
+        end
+    end
+    if !applicable(dep)
+        return
+    end
+    for method in methods
+        for (p,opts) in getallproviders(dep,method)
+            can_provide(p,opts,dep) || continue
+            if haskey(opts,:force_depends)
+                for (dmethod,ddep) in opts[:force_depends]
+                    (dp,dopts) = getallproviders(ddep,dmethod)[1]
+                    run(lower(generate_steps(ddep,dp,dopts)))
+                end
+            end
+            run(lower(generate_steps(dep,p,opts)))
+            !issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
+            return p
+        end
+    end
+    error("""
+        None of the selected providers can install dependency $(dep.name).
+        Use BinDeps.debug(package_name) to see available providers
+        """)
 end
 
 execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
@@ -482,10 +692,19 @@ macro install (_libmaps...)
                     load_cache = Dict()
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
-                            BinDeps.satisfy!(d)
-                            lib = BinDeps._find_library(d)
-                            if lib != ""
-                                load_cache[d.name] = lib
+                            p = BinDeps.satisfy!(d)
+                            libs = BinDeps._find_library(d; provider = p)
+                            if isa(d, BinDeps.LibraryGroup)
+                                if !isempty(libs)
+                                    for dep in d.deps
+                                        !BinDeps.applicable(dep) && continue
+                                        load_cache[dep.name] = libs[dep][2]
+                                    end
+                                end
+                            else
+                                for (k,v) in libs
+                                    load_cache[k.name] = v[2]
+                                end
                             end
                         end
                     end
