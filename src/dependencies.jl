@@ -398,7 +398,9 @@ function _find_library(dep::LibraryDependency; provider = Any)
             h = dlopen_e(l, RTLD_LAZY)
             if h != C_NULL
                 works = dep.libvalidate(l,h)
-                l = Sys.dlpath(h)
+                if VERSION >= v"0.3-"
+                    l = Sys.dlpath(h)
+                end
                 dlclose(h)
                 if works
                     push!(ret, (p, l))
