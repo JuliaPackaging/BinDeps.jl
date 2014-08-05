@@ -411,57 +411,73 @@ function _find_library(dep::LibraryDependency; provider = Any)
             end
         end
     end
-    # Now check system libraries
-    for lib in libnames
-        # We don't want to use regular dlopen, because we want to get at
-        # system libraries even if one of our providers is higher in the
-        # DL_LOAD_PATH
-        for path in Base.DL_LOAD_PATH
-            for ext in EXTENSIONS
-                opath = string(joinpath(path,lib),".",ext)
-                check_path!(ret,dep,opath)
+    # 0.2 compatibility
+    if VERSION < v"0.3-"
+        for lib in libnames
+            p = dlopen_e(lib, RTLD_LAZY)
+            if p != C_NULL
+                works = dep.libvalidate(lib,p)
+                dlclose(p)
+                if works
+                    push!(ret,(SystemPaths(),lib))
+                end
             end
         end
-        for ext in EXTENSIONS
-            opath = string(lib,".",ext)
-            check_path!(ret,dep,opath)
+    else
+        # Now check system libraries
+        for lib in libnames
+            # We don't want to use regular dlopen, because we want to get at
+            # system libraries even if one of our providers is higher in the
+            # DL_LOAD_PATH
+            for path in Base.DL_LOAD_PATH
+                for ext in EXTENSIONS
+                    opath = string(joinpath(path,lib),".",ext)
+                    check_path!(ret,dep,opath)
+                end
+            end
+            for ext in EXTENSIONS
+                opath = string(lib,".",ext)
+                check_path!(ret,dep,opath)
+            end
         end
     end
     return ret
 end
 
-function check_path!(ret,dep,opath)
-    flags = RTLD_LAZY
-    handle = c_malloc(2*sizeof(Ptr{Void}))
-    err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
-    if err == 0
-        check_system_handle!(ret,dep,handle)
-        dlclose(handle)
-        c_free(handle)
+if VERSION >= v"0.3-"
+    function check_path!(ret,dep,opath)
+        flags = RTLD_LAZY
+        handle = c_malloc(2*sizeof(Ptr{Void}))
+        err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
+        if err == 0
+            check_system_handle!(ret,dep,handle)
+            dlclose(handle)
+            c_free(handle)
+        end
     end
-end
 
-function check_system_handle!(ret,dep,handle)
-    if handle != C_NULL
-        libpath = Sys.dlpath(handle)
-        # Check that this is not a duplicate
-        for p in ret
-            try
-                if realpath(p[2]) == realpath(libpath)
+    function check_system_handle!(ret,dep,handle)
+        if handle != C_NULL
+            libpath = Sys.dlpath(handle)
+            # Check that this is not a duplicate
+            for p in ret
+                try
+                    if realpath(p[2]) == realpath(libpath)
+                        return
+                    end
+                catch
+                    warn("""
+                        Found a library that does not exist.
+                        This may happen if the library has an active open handle.
+                        Please quit julia and try again.
+                        """)
                     return
                 end
-            catch
-                warn("""
-                    Found a library that does not exist.
-                    This may happen if the library has an active open handle.
-                    Please quit julia and try again.
-                    """)
-                return
             end
-        end
-        works = dep.libvalidate(libpath,handle)
-        if works
-            push!(ret, (SystemPaths(), libpath))
+            works = dep.libvalidate(libpath,handle)
+            if works
+                push!(ret, (SystemPaths(), libpath))
+            end
         end
     end
 end
@@ -681,7 +697,7 @@ macro install (_libmaps...)
                 for d in bindeps_context.deps
                     BinDeps.satisfy!(d)
                 end
-            end  
+            end
         end)
     else
         libmaps = eval(_libmaps[1])
