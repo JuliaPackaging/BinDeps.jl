@@ -403,7 +403,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 end
                 dlclose(h)
                 if works
-                    push!(ret, (p, l))
+                    push!(ret, ((p, opts), l))
                 else
                     # We tried to load this providers' library, but it didn't satisfy
                     # the requirements, so tell it to force a rebuild since the requirements
@@ -421,7 +421,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 works = dep.libvalidate(lib,p)
                 dlclose(p)
                 if works
-                    push!(ret,(SystemPaths(),lib))
+                    push!(ret,((SystemPaths(),(Any=>Any)[]),lib))
                 end
             end
         end
@@ -478,7 +478,7 @@ if VERSION >= v"0.3-"
             end
             works = dep.libvalidate(libpath,handle)
             if works
-                push!(ret, (SystemPaths(), libpath))
+                push!(ret, ((SystemPaths(),(Any=>Any)[]), libpath))
             end
         end
     end
@@ -546,7 +546,7 @@ function satisfied_providers(deps::LibraryGroup, allfl = allf(deps))
         if !applicable(dep)
             continue
         end
-        providers = map(x->typeof(x[1]),allfl[dep])
+        providers = map(x->typeof(x[1][1]),allfl[dep])
         if viable_providers == nothing
             viable_providers = providers
         else
@@ -596,14 +596,12 @@ function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
         thisfl = allfl[dep]
         ret = nothing
         for fl in thisfl
-            if isa(fl[1],p)
+            if isa(fl[1][1],p)
                 ret = fl
                 break
             end
         end
-        if ret == nothing
-            error("TEST")
-        end
+        @assert ret != nothing
         ret
     end for dep in filter(applicable,deps.deps)]
 end
@@ -657,7 +655,7 @@ function satisfy!(deps::LibraryGroup, methods = defaults)
 end
 
 function satisfy!(dep::LibraryDependency, methods = defaults)
-    sp = map(x->typeof(x[1]),_find_library(dep))
+    sp = map(x->typeof(x[1][1]),_find_library(dep))
     if !isempty(sp)
         for m in methods
             for s in sp
@@ -708,6 +706,7 @@ macro install (_libmaps...)
         push!(ret.args,
             esc(quote
                     load_cache = Dict()
+                    load_hooks = String[]
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
@@ -717,11 +716,19 @@ macro install (_libmaps...)
                                     for dep in d.deps
                                         !BinDeps.applicable(dep) && continue
                                         load_cache[dep.name] = libs[dep][2]
+                                        opts = libs[dep][1][2]
+                                        if haskey(opts,:onload) && !(opts[:onload] in load_hooks)
+                                            push!(load_hooks,opts[:onload])
+                                        end
                                     end
                                 end
                             else
                                 for (k,v) in libs
                                     load_cache[d.name] = v
+                                    opts = k[2]
+                                    if haskey(opts,:onload) && !(opts[:onload] in load_hooks)
+                                        push!(load_hooks,opts[:onload])
+                                    end
                                 end
                             end
                         end
@@ -735,6 +742,7 @@ macro install (_libmaps...)
                         ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
                         println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
                     end
+                    println(depsfile, join(load_hooks,"\n"))
                     close(depsfile)
                 end))
         if !(typeof(libmaps) <: Associative)
