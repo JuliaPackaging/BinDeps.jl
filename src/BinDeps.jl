@@ -127,6 +127,11 @@ module BinDeps
         dest::String    #local_file
     end
 
+    type ChecksumValidator <: BuildStep
+        sha::String
+        path::String
+    end
+
     type FileUnpacker <: BuildStep
         src::String     #file
         dest::String    #directory
@@ -313,6 +318,7 @@ module BinDeps
     lower(s::BuildStep,collection) = push!(collection,s)
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
     lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
+    lower(s::ChecksumValidator,collection) = isempty(s.sha) || @dependent_steps sha_check(s.path, s.sha)
     function splittarpath(path) 
         path,extension = splitext(path)
         base_filename,secondary_extension = splitext(path)
