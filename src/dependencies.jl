@@ -890,20 +890,13 @@ function build(pkg::String, method; dep::String="", force=false)
 end
 
 # Calculate the SHA-512 hash of a file
-if success(`shasum -v`)
-    shasum(path) = split(readall(`shasum -a 512 $path`))[1]
-elseif success(`sha512sum -v`)
-    shasum(path) = split(readall(`sha512sum $path`))[1]
-else
-    function shasum(path)
-        info("No utility found for checksumming downloads; skipping checksum verification")
-        return nothing
-    end
-end
+using SHA
 
 function sha_check(path, sha)
-    calc_sha = shasum(path)
-    if calc_sha != nothing && calc_sha != sha
+    ctx = SHA256_CTX()
+    update!(ctx, readbytes(open(path)))
+    calc_sha = bytes2hex(digest!(ctx))
+    if calc_sha != sha
         error("Checksum mismatch!  Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again")
     end
 end
