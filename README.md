@@ -190,6 +190,11 @@ There are also several builtin options. Some of them are:
  	This argument takes has the same syntax as the `os` keyword argument to \
 	`library_dependency`.
 
+ * `installed_libpath = "path"`
+
+ 	If the provider installs a library dependency to someplace other than the
+ 	standard search paths, that location can be specified here.
+
 # The high level interface - built in providers
 
 We have already seen the `AptGet`, and `Yum` providers, which all take a string naming the package as their data argument. The other build-in providers are:
