@@ -367,7 +367,7 @@ end
 
 #
 # Finds all copies of the library on the system, listed in preference order.
-# Return value is an array of tuples if the provider and the path where it is found
+# Return value is an array of tuples of the provider and the path where it is found
 #
 function _find_library(dep::LibraryDependency; provider = Any)
     ret = Any[]
@@ -378,7 +378,14 @@ function _find_library(dep::LibraryDependency; provider = Any)
     for (p,opts) in providers
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = String[]
+
+        # Allow user to override installation path
+        if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
+            unshift!(paths,opts[:installed_libpath])
+        end
+
         push!(paths,libdir(p,dep))
+
         if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
             push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
         end
