@@ -361,9 +361,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     steps
 end
 
-@osx_only const EXTENSIONS = ["","dylib"]
-@windows_only const EXTENSIONS = ["", "dll"]
-@linux_only const EXTENSIONS = ["","so"]
+@osx_only const EXTENSIONS = ["",".dylib"]
+@windows_only const EXTENSIONS = ["", ".dll"]
+@linux_only const EXTENSIONS = ["",".so"]
 
 #
 # Finds all copies of the library on the system, listed in preference order.
@@ -442,12 +442,12 @@ function _find_library(dep::LibraryDependency; provider = Any)
             # DL_LOAD_PATH
             for path in Base.DL_LOAD_PATH
                 for ext in EXTENSIONS
-                    opath = string(joinpath(path,lib),".",ext)
+                    opath = string(joinpath(path,lib),ext)
                     check_path!(ret,dep,opath)
                 end
             end
             for ext in EXTENSIONS
-                opath = string(lib,".",ext)
+                opath = string(lib,ext)
                 check_path!(ret,dep,opath)
             end
         end
