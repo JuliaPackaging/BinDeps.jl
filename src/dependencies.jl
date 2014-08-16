@@ -450,6 +450,10 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 opath = string(lib,ext)
                 check_path!(ret,dep,opath)
             end
+            @linux_only begin
+                soname = ccall(:jl_lookup_soname, Ptr{Uint8}, (Ptr{Uint8}, Csize_t), lib, sizeof(lib))
+                soname != C_NULL && check_path!(ret,dep,bytestring(soname))
+            end
         end
     end
     return ret
