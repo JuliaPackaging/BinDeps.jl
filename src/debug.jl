@@ -9,7 +9,7 @@ function _show_indented(io::IO, dep::LibraryDependency, indent, lib)
         if !isempty(lib)
             print_indented(io,"- Satisfied by:\n",indent+4)
             for (k,v) in lib
-                print_indented(io,"- $k at $v\n",indent+6)
+                print_indented(io,"- $(k[1]) at $v\n",indent+6)
             end
         end
         if length(dep.providers) > 0
@@ -44,7 +44,7 @@ function show(io::IO, deps::LibraryGroup)
     end
 end
 
-function debug(io,pkg::String)
+function debug_context(pkg::String)
     info("Reading build script...")
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
@@ -52,6 +52,11 @@ function debug(io,pkg::String)
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)
+    context
+end
+
+function debug(io,pkg::String)
+    context = debug_context(pkg)
     println(io,"The package declares $(length(context.deps)) dependencies.")
     for dep in context.deps
         show(io,dep)
