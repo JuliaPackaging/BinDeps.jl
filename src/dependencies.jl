@@ -113,7 +113,7 @@ function available_version(p::AptGet)
 end
 pkg_name(a::AptGet) = a.package
 
-libdir(p::AptGet,dep) = "/usr/lib"
+libdir(p::AptGet,dep) = ["/usr/lib", "/usr/lib64", "/usr/lib32", "/usr/lib/x86_64-linux-gnu", "/usr/lib/i386-linux-gnu"]
 
 const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
@@ -384,21 +384,13 @@ function _find_library(dep::LibraryDependency; provider = Any)
             unshift!(paths,opts[:installed_libpath])
         end
 
-        push!(paths,libdir(p,dep))
+        ppaths = libdir(p,dep)
+        append!(paths,isa(ppaths,Array) ? ppaths : [ppaths])
 
         if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
             push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
         end
 
-        # Many linux distributions use lib32/lib64 as well
-        @unix_only begin
-            if isdir(libdir(p,dep)*"32")
-                push!(paths, libdir(p,dep)*"32")
-            end
-            if isdir(libdir(p,dep)*"64")
-                push!(paths, libdir(p,dep)*"64")
-            end
-        end
         # Windows, do you know what `lib` stands for???
         @windows_only push!(paths,bindir(p,dep))
         (isempty(paths) || all(map(isempty,paths))) && continue
