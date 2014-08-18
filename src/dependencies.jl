@@ -97,19 +97,43 @@ library_dependency(args...; properties...) = error("No context provided. Did you
 
 abstract PackageManager <: DependencyProvider
 
+DEBIAN_VERSION_REGEX = r"^
+    ([0-9]+\:)?                                           # epoch
+    (?:(?:([0-9][a-z0-9.\-+:~]*)-([0-9][a-z0-9.+~]*)) |   # upstream version + debian revision
+          ([0-9][a-z0-9.+:~]*))                           # upstream version 
+"ix
+
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
     package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
-package_available(p::AptGet) = can_use(AptGet) && beginswith(readall(`apt-cache showpkg $(p.package)`),"Package:")
-function available_version(p::AptGet)
-    for l in eachline(`apt-cache show $(p.package)`)
+package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
+function available_versions(p::AptGet)
+    vers = ASCIIString[]
+    lookfor_version = false
+    for l in eachline(`apt-cache showpkg $(p.package)`)
         if beginswith(l,"Version:")
-            return convert(VersionNumber,l[(1+length("Version: ")):end])
+            try
+                vs = l[(1+length("Version: ")):end]
+                push!(vers, vs)
+            end
+        elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) != nothing
+            m.captures[2] != nothing ? push!(vers, m.captures[2]) :
+                                       push!(vers, m.captures[4])
+        elseif beginswith(l, "Versions:")
+            lookfor_version = true
+        elseif beginswith(l, "Reverse Depends:")
+            lookfor_version = false
         end
     end
-    error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
+    return vers
+end
+function available_version(p::AptGet)
+    vers = available_versions(p)
+    isempty(vers) && error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
+    length(vers) > 1 && warn("Multiple versions of $(p.package) are available.  Use BinDeps.available_versions to get all versions.")
+    return vers[end]
 end
 pkg_name(a::AptGet) = a.package
 
