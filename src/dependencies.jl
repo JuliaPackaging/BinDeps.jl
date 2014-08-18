@@ -598,7 +598,7 @@ function viable_providers(deps::LibraryGroup)
             vp = intersect(vp,providers)
         end
     end
-    vp
+    push!(vp,SystemPaths)
 end
 
 #
