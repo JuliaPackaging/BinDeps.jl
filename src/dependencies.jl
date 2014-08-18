@@ -43,7 +43,7 @@ includedir(dep) = joinpath(usrdir(dep),"include")
 builddir(dep) = joinpath(depsdir(dep),"builds")
 downloadsdir(dep) = joinpath(depsdir(dep),"downloads")
 srcdir(dep) = joinpath(depsdir(dep),"src")
-libdir(provider, dep) = libdir(dep)
+libdir(provider, dep) = [libdir(dep), libdir(dep)*"32", libdir(dep)*"64"]
 bindir(provider, dep) = bindir(dep)
 
 successful_validate(l,p) = true
