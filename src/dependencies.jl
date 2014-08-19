@@ -515,13 +515,13 @@ end
 
 # Default installation method
 if OS_NAME == :Darwin
-    defaults = [Binaries,PackageManager,BuildProcess]
+    defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
 elseif OS_NAME == :Linux
-    defaults = [PackageManager,BuildProcess]
+    defaults = [PackageManager,SystemPaths,BuildProcess]
 elseif OS_NAME == :Windows
-    defaults = [Binaries,PackageManager]
+    defaults = [Binaries,PackageManager,SystemPaths]
 else
-    defaults = [BuildProcess]
+    defaults = [SystemPaths,BuildProcess]
 end
 
 function applicable(dep::LibraryDependency)
@@ -598,7 +598,7 @@ function viable_providers(deps::LibraryGroup)
             vp = intersect(vp,providers)
         end
     end
-    push!(vp,SystemPaths)
+    vp
 end
 
 #
