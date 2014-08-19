@@ -165,6 +165,33 @@ function available_version(y::Yum)
 end
 pkg_name(y::Yum) = y.package
 
+const has_pacman = try success(`pacman - V`) catch e false end
+type Pacman <: PackageManager 
+    package::String
+end
+can_use(::Type{Pacman}) = has_pacman && OS_NAME == :Linux
+package_available(p::Pacman) = can_use(Pacman) && !isempty(available_versions(p))
+function available_versions(p::Pacman)
+    vers = ASCIIString[]
+
+    count = 0
+    for l in eachline(`/usr/bin/pacman -Ss $(p.package)`) # To circumvent alias problems
+        count += 1
+        even(count) && continue # Skip even lines
+        push(vers, chomp(l))
+    end
+    return vers
+end
+function available_version(p::Pacman)
+    vers = available_versions(p)
+    isempty(vers) && error("pacman did not return version information. This shouldn't happen. Please file a bug!")
+    length(vers) > 1 && warn("Multiple versions of $(p.package) are available. Use BinDeps.available_versions to get all versions.")
+    return first(vers)
+end
+pkg_name(a::Pacman) = a.package
+
+libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
+
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
@@ -271,6 +298,18 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo yum install $(h.package)`:")
         `sudo yum install $(h.package)`
+        ()->(ccall(:jl_read_sonames,Void,()))
+    end
+end
+function generate_steps(dep::LibraryDependency,h::Pacman,opts) 
+    if get(opts,:force_rebuild,false) 
+        error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
+              "Please make any necessary adjustments manually (This might just be a version upgrade)")
+    end
+
+    @build_steps begin
+        println("Installing dependency $(h.package) via `sudo pacman -S $(h.package)`:")
+        `sudo pacman -S $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
