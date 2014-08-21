@@ -303,7 +303,7 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
 end
 function generate_steps(dep::LibraryDependency,h::Pacman,opts) 
     if get(opts,:force_rebuild,false) 
-        error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
+        error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
 
