@@ -165,30 +165,37 @@ function available_version(y::Yum)
 end
 pkg_name(y::Yum) = y.package
 
-const has_pacman = try success(`pacman - V`) catch e false end
-type Pacman <: PackageManager 
+# Pacman/Yaourt are package managers for Arch Linux.
+
+# Note that `pacman --version` has an unreliable return value.
+const has_pacman = try success(`pacman -Qq`) catch e false end
+type Pacman <: PackageManager
     package::String
 end
 can_use(::Type{Pacman}) = has_pacman && OS_NAME == :Linux
-package_available(p::Pacman) = can_use(Pacman) && !isempty(available_versions(p))
-function available_versions(p::Pacman)
-    vers = ASCIIString[]
-
-    count = 0
-    for l in eachline(`/usr/bin/pacman -Ss $(p.package)`) # To circumvent alias problems
-        count += 1
-        even(count) && continue # Skip even lines
-        push(vers, chomp(l))
-    end
-    return vers
-end
+package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
+# Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
-    vers = available_versions(p)
-    isempty(vers) && error("pacman did not return version information. This shouldn't happen. Please file a bug!")
-    length(vers) > 1 && warn("Multiple versions of $(p.package) are available. Use BinDeps.available_versions to get all versions.")
-    return first(vers)
+    for l in eachline(`/usr/bin/pacman -Si $(p.package)`) # To circumvent alias problems
+        if beginswith(l, "Version")
+            # The following isn't perfect, but it's hopefully less brittle than
+            # writing a regex for pacman's nonexistent version-string standard.
+
+            # This also strips away the sometimes leading epoch as in ffmpeg's
+            # Version        : 1:2.3.3-1
+            versionstr = strip(split(l, ":")[end])
+            try
+                return convert(VersionNumber, versionstr)
+            catch e
+                # For too long versions like imagemagick's 6.8.9.6-1, give it
+                # a second try just discarding superfluous stuff.
+                return convert(VersionNumber, join(split(versionstr, '.')[1:3], '.'))
+            end
+        end
+    end
+    error("pacman did not return version information. This shouldn't happen. Please file a bug!")
 end
-pkg_name(a::Pacman) = a.package
+pkg_name(p::Pacman) = p.package
 
 libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
@@ -248,7 +255,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
 
-export AptGet, Yum, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -278,8 +285,8 @@ end
 
 generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
 generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
-function generate_steps(dep::LibraryDependency,h::AptGet,opts) 
-    if get(opts,:force_rebuild,false) 
+function generate_steps(dep::LibraryDependency,h::AptGet,opts)
+    if get(opts,:force_rebuild,false)
         error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
@@ -289,8 +296,8 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
-function generate_steps(dep::LibraryDependency,h::Yum,opts) 
-    if get(opts,:force_rebuild,false) 
+function generate_steps(dep::LibraryDependency,h::Yum,opts)
+    if get(opts,:force_rebuild,false)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
@@ -301,15 +308,14 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
-function generate_steps(dep::LibraryDependency,h::Pacman,opts) 
-    if get(opts,:force_rebuild,false) 
+function generate_steps(dep::LibraryDependency,h::Pacman,opts)
+    if get(opts,:force_rebuild,false)
         error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-
     @build_steps begin
-        println("Installing dependency $(h.package) via `sudo pacman -S $(h.package)`:")
-        `sudo pacman -S $(h.package)`
+        println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
+        `sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
