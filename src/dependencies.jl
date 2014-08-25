@@ -178,13 +178,17 @@ package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.packag
 function available_version(p::Pacman)
     for l in eachline(`/usr/bin/pacman -Si $(p.package)`) # To circumvent alias problems
         if beginswith(l, "Version")
-            versionstr = strip(split(l, ": ", 2)[2])
+            # The following isn't perfect, but it's hopefully less brittle than
+            # writing a regex for pacman's nonexistent version-string standard.
+
+            # This also strips away the sometimes leading epoch as in ffmpeg's
+            # Version        : 1:2.3.3-1
+            versionstr = strip(split(l, ":")[end])
             try
                 return convert(VersionNumber, versionstr)
             catch e
-                # For too long versions like imagemagick's 6.8.9.6-1
-                # This isn't perfect, but it's hopefully less brittle than
-                # writing a regex for pacman's nonexistent version-string standard.
+                # For too long versions like imagemagick's 6.8.9.6-1, give it
+                # a second try just discarding superfluous stuff.
                 return convert(VersionNumber, join(split(versionstr, '.')[1:3], '.'))
             end
         end
