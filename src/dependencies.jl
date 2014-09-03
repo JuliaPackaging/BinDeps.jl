@@ -965,9 +965,7 @@ end
 using SHA
 
 function sha_check(path, sha)
-    ctx = SHA256_CTX()
-    update!(ctx, readbytes(open(path)))
-    calc_sha = bytes2hex(digest!(ctx))
+    calc_sha = sha256(open(path))
     if calc_sha != sha
         error("Checksum mismatch!  Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again")
     end
