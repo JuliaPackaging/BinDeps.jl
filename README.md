@@ -33,7 +33,7 @@ the actual package, I want to answer a few common questions:
 
     Since BinDeps is written in Julia it is extensible with the same ease as the rest of Julia. In particular, defining new behavior,
     e.g. for adding a new package manger, consists of little more than
-    adding a type and implementing a couple of methods (see the section on Interfaces) or the RPMmd package for an example implementation. 
+    adding a type and implementing a couple of methods (see the section on Interfaces) or the [WinRPM package](https://github.com/JuliaLang/WinRPM.jl) for an example implementation. 
 
   * I like the runtime features that BinDeps provides, but I don't 
     really want to use its build time capabilities. What do you 
