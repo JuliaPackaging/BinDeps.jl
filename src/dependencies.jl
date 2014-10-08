@@ -221,8 +221,8 @@ type NetworkSource <: Sources
     uri::URI
 end
 
-srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,(Symbol=>Any)[])
 function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
+srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
@@ -380,11 +380,11 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
-        h.source = (h.source,(Symbol=>Any)[])
+        h.source = (h.source,Dict{Symbol,Any}())
     end
     is(h.source[1], nothing) && error("Could not obtain sources for dependency $(dep.name)")
     steps = lower(generate_steps(dep,h.source...))
-    opts = {:srcdir=>srcdir(dep,h.source...), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
+    opts = Dict(:srcdir=>srcdir(dep,h.source...), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name))
     merge!(opts,h.opts)
     if haskey(opts,:installed_libname)
         !haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
@@ -491,7 +491,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 works = dep.libvalidate(lib,p)
                 dlclose(p)
                 if works
-                    push!(ret,((SystemPaths(),(Any=>Any)[]),lib))
+                    push!(ret,((SystemPaths(),Dict{Any,Any}()),lib))
                 end
             end
         end
@@ -552,7 +552,7 @@ if VERSION >= v"0.3-"
             end
             works = dep.libvalidate(libpath,handle)
             if works
-                push!(ret, ((SystemPaths(),(Any=>Any)[]), libpath))
+                push!(ret, ((SystemPaths(),Dict{Any,Any}()), libpath))
             end
         end
     end
@@ -657,7 +657,7 @@ function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
     providers = satisfied_providers(deps,allfl)
     p = nothing
     if isempty(providers)
-        return (Any=>Any)[]
+        return Dict{Any,Any}()
     else
         for p2 in providers
             if p2 <: provider

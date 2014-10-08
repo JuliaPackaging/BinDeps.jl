@@ -143,10 +143,10 @@ module BinDeps
     	dir::String
     	targets::Vector{ASCIIString}
         env::Dict
-    	MakeTargets(dir,target;env = (String=>String)[]) = new(dir,target,env)
-    	MakeTargets(target::Vector{ASCIIString};env = (String=>String)[]) = new("",target,env)
-    	MakeTargets(target::ASCIIString;env = (String=>String)[]) = new("",[target],env)
-    	MakeTargets(;env = (String=>String)[]) = new("",ASCIIString[],env)
+    	MakeTargets(dir,target;env = Dict{String,String}()) = new(dir,target,env)
+    	MakeTargets(target::Vector{ASCIIString};env = Dict{String,String}()) = new("",target,env)
+    	MakeTargets(target::ASCIIString;env = Dict{String,String}()) = new("",[target],env)
+    	MakeTargets(;env = Dict{String,String}()) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
