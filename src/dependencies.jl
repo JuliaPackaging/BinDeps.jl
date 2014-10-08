@@ -61,7 +61,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),Array((DependencyHelper,Dict{Symbol,Any}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
+    r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),Array((DependencyHelper,Dict{Symbol,Any}),0),Dict{Symbol,Any}(properties),validate)
     if group !== nothing
         push!(group.deps,r)
     else
@@ -84,7 +84,7 @@ macro setup()
         if length(ARGS) > 0 && isa(ARGS[1],BinDeps.PackageContext)
             bindeps_context = ARGS[1]
         else
-            bindeps_context = BinDeps.PackageContext(true,$dir,$package,{})
+            bindeps_context = BinDeps.PackageContext(true,$dir,$package,Any[])
         end
         library_group(args...) = BinDeps._library_group(bindeps_context,args...)
         library_dependency(args...; properties...) = BinDeps._library_dependency(bindeps_context,args...;properties...)
@@ -221,7 +221,7 @@ type NetworkSource <: Sources
     uri::URI
 end
 
-srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,(Symbol=>Any)[])
+srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
 function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
@@ -253,7 +253,7 @@ end
 
 lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelper(x.dep,Sources)...))
 
-Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
+Autotools(;opts...) = Autotools(nothing,Dict{Any,Any}(opts))
 
 export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
@@ -266,8 +266,8 @@ provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; op
 provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection); opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
-provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
+provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol,Any}(opts)))
+provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol,Any}(opts)))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
 function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...)
     p = provider(T,ps; opts...)
@@ -349,7 +349,7 @@ function getoneprovider(dep::LibraryDependency,method)
 end
 
 function getallproviders(dep::LibraryDependency,method)
-    ret = {}
+    ret = Any[]
     for (p,opts) = dep.providers
         if typeof(p) <: method && can_use(typeof(p))
             push!(ret,(p,opts))
@@ -380,11 +380,13 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
-        h.source = (h.source,(Symbol=>Any)[])
+        h.source = (h.source,Dict{Symbol,Any}())
     end
     is(h.source[1], nothing) && error("Could not obtain sources for dependency $(dep.name)")
     steps = lower(generate_steps(dep,h.source...))
-    opts = {:srcdir=>srcdir(dep,h.source...), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
+    opts = @compat Dict{Any,Any}(:srcdir => srcdir(dep,h.source...),
+                                 :prefix => usrdir(dep),
+                                 :builddir => joinpath(builddir(dep),dep.name))
     merge!(opts,h.opts)
     if haskey(opts,:installed_libname)
         !haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
@@ -491,7 +493,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 works = dep.libvalidate(lib,p)
                 dlclose(p)
                 if works
-                    push!(ret,((SystemPaths(),(Any=>Any)[]),lib))
+                    push!(ret,((SystemPaths(),Dict{Any,Any}()),lib))
                 end
             end
         end
@@ -552,7 +554,7 @@ if VERSION >= v"0.3-"
             end
             works = dep.libvalidate(libpath,handle)
             if works
-                push!(ret, ((SystemPaths(),(Any=>Any)[]), libpath))
+                push!(ret, ((SystemPaths(),Dict{Any,Any}()), libpath))
             end
         end
     end
@@ -571,7 +573,8 @@ end
 
 function applicable(dep::LibraryDependency)
     if haskey(dep.properties,:os)
-        if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
+        if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) ||
+           (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
             return false
         end
     elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
@@ -657,7 +660,7 @@ function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
     providers = satisfied_providers(deps,allfl)
     p = nothing
     if isempty(providers)
-        return (Any=>Any)[]
+        return Dict{Any,Any}()
     else
         for p2 in providers
             if p2 <: provider
@@ -886,7 +889,7 @@ macro load_dependencies(args...)
             pkg = dir[(last(r)+2):end]
         end
     end
-    context = BinDeps.PackageContext(false,dir,pkg,{})
+    context = BinDeps.PackageContext(false,dir,pkg,Any[])
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)
@@ -956,7 +959,7 @@ end
 function build(pkg::String, method; dep::String="", force=false)
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
-    context = BinDeps.PackageContext(false,dir,pkg,{})
+    context = BinDeps.PackageContext(false,dir,pkg,Any[])
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)
