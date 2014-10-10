@@ -780,7 +780,8 @@ macro install (_libmaps...)
         push!(ret.args,
             esc(quote
                     load_cache = Dict()
-                    load_hooks = String[]
+                    pre_hooks = Set{String}()
+                    load_hooks = Set{String}()
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
@@ -791,27 +792,30 @@ macro install (_libmaps...)
                                         !BinDeps.applicable(dep) && continue
                                         load_cache[dep.name] = libs[dep][2]
                                         opts = libs[dep][1][2]
-                                        if haskey(opts,:onload) && !(opts[:onload] in load_hooks)
-                                            push!(load_hooks,opts[:onload])
-                                        end
+                                        haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
+                                        haskey(opts, :onload) && push!(load_hooks,opts[:onload])
                                     end
                                 end
                             else
                                 for (k,v) in libs
                                     load_cache[d.name] = v
                                     opts = k[2]
-                                    if haskey(opts,:onload) && !(opts[:onload] in load_hooks)
-                                        push!(load_hooks,opts[:onload])
-                                    end
+                                    haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
+                                    haskey(opts, :onload) && push!(load_hooks,opts[:onload])
                                 end
                             end
                         end
                     end
+
+                    # Generate "deps.jl" file for runtime loading
                     depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
-                    println(depsfile, "macro checked_lib(libname, path)
-        (dlopen_e(path) == C_NULL) && error(\"Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.\")
-        quote const \$(esc(libname)) = \$path end
-    end")
+                    println(depsfile, join(pre_hooks, "\n"))
+                    println(depsfile,
+                        """
+                        macro checked_lib(libname, path)
+                            (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
+                            quote const \$(esc(libname)) = \$path end
+                        end""")
                     for libkey in keys($libmaps)
                         ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
                         println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
