@@ -1,5 +1,6 @@
 module BinDeps
     importall Base
+    using Compat
 
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
             Choice, Choices, CCompile, FileDownloader, FileRule,
