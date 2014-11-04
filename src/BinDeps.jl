@@ -7,6 +7,8 @@ module BinDeps
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
             autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
+    typealias StringDict Dict{AbstractString, AbstractString}
+
     const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
@@ -43,7 +45,7 @@ module BinDeps
     abstract BuildStep
 
     downloadcmd = nothing
-    function download_cmd(url::String, filename::String)
+    function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
             for checkcmd in (:curl, :wget, :fetch)
@@ -99,79 +101,95 @@ module BinDeps
 
     type SynchronousStepCollection
         steps::Vector{Any}
-        cwd::String
-        oldcwd::String
-        SynchronousStepCollection(cwd) = new({},cwd,cwd)
-        SynchronousStepCollection() = new({},"","")
+        cwd::AbstractString
+        oldcwd::AbstractString
+        SynchronousStepCollection(cwd) = new(Any[],cwd,cwd)
+        SynchronousStepCollection() = new(Any[],"","")
     end
 
     import Base.push!, Base.run, Base.(|)
     push!(a::SynchronousStepCollection,args...) = push!(a.steps,args...)
 
     type ChangeDirectory <: BuildStep
-        dir::String
+        dir::AbstractString
     end
 
     type CreateDirectory <: BuildStep
-        dest::String
+        dest::AbstractString
         mayexist::Bool
         CreateDirectory(dest, me) = new(dest,me)
         CreateDirectory(dest) = new(dest,true)
     end
 
     immutable RemoveDirectory <: BuildStep
-        dest::String
+        dest::AbstractString
     end
 
     type FileDownloader <: BuildStep
-        src::String     #url
-        dest::String    #local_file
+        src::AbstractString #url
+        dest::AbstractString #local_file
     end
 
     type ChecksumValidator <: BuildStep
-        sha::String
-        path::String
+        sha::AbstractString
+        path::AbstractString
     end
 
     type FileUnpacker <: BuildStep
-        src::String     #file
-        dest::String    #directory
-        target::String  #file inside the archive to test for existence (or blank to check for a.tgz => a/)
+        src::AbstractString #file
+        dest::AbstractString #directory
+        target::AbstractString #file inside the archive to test for existence (or blank to check for a.tgz => a/)
     end
 
 
     type MakeTargets <: BuildStep
-    	dir::String
+    	dir::AbstractString
     	targets::Vector{ASCIIString}
         env::Dict
-    	MakeTargets(dir,target;env = (String=>String)[]) = new(dir,target,env)
-    	MakeTargets(target::Vector{ASCIIString};env = (String=>String)[]) = new("",target,env)
-    	MakeTargets(target::ASCIIString;env = (String=>String)[]) = new("",[target],env)
-    	MakeTargets(;env = (String=>String)[]) = new("",ASCIIString[],env)
+
+    	MakeTargets(dir,target; env=StringDict()) = new(dir,target,env)
+    	MakeTargets(target::Vector{ASCIIString}; env=StringDict()) = new("",target,env)
+    	MakeTargets(target::ASCIIString; env=StringDict()) = new("",[target],env)
+    	MakeTargets(;env=StringDict()) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
-        src::String     #src direcory
-        prefix::String
-        builddir::String
-        configure_options::Vector{String}
-        libtarget::Vector{String}
-        include_dirs::Vector{String}
-        lib_dirs::Vector{String}
-        rpath_dirs::Vector{String}
+        src::AbstractString #src directory
+        prefix::AbstractString
+        builddir::AbstractString
+        configure_options::Vector{AbstractString}
+        libtarget::Vector{AbstractString}
+        include_dirs::Vector{AbstractString}
+        lib_dirs::Vector{AbstractString}
+        rpath_dirs::Vector{AbstractString}
         installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
-    	config_status_dir::String
+    	config_status_dir::AbstractString
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], rpath_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
-            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
+
+        AutotoolsDependency(;srcdir::AbstractString="", 
+                             prefix::AbstractString="", 
+                             builddir::AbstractString="", 
+                             configure_options=AbstractString[], 
+                             libtarget=AbstractString[], 
+                             include_dirs=AbstractString[], 
+                             lib_dirs=AbstractString[],
+                             rpath_dirs=AbstractString[],
+                             installed_libpath=ByteString[],
+                             force_rebuild::Bool=false,
+                             config_status_dir::AbstractString="",
+                             env=Dict{ByteString,ByteString}()) = 
+            new(srcdir, prefix, builddir, configure_options,
+                isa(libtarget,Vector) ? libtarget : AbstractString[libtarget],
+                include_dirs, lib_dirs, rpath_dirs, installed_libpath, 
+                config_status_dir, force_rebuild, env)
     end
 
     ### Choices
 
     type Choice
         name::Symbol
-        description::String
+        description::AbstractString
         step::SynchronousStepCollection
         Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
     end 
@@ -205,8 +223,8 @@ module BinDeps
     end
 
     type CCompile <: BuildStep
-        srcFile::String
-        destFile::String
+        srcFile::AbstractString
+        destFile::AbstractString
         options::Vector{ASCIIString}
         libs::Vector{ASCIIString}
     end
@@ -215,7 +233,7 @@ module BinDeps
     ##
 
     type DirectoryRule <: BuildStep
-        dir::String
+        dir::AbstractString
         step
     end
 
@@ -297,14 +315,15 @@ module BinDeps
 
     # Create any of these files
     type FileRule <: BuildStep
-        file::Array{String}
+        file::Array{AbstractString}
         step
-        FileRule(file::String,step) = FileRule(String[file],step)
-    	function FileRule(files::Vector{String},step) 
+
+        FileRule(file::AbstractString,step) = FileRule(AbstractString[file],step)
+    	function FileRule(files::Vector{AbstractString},step) 
             new(files,@build_steps (step,) )
     	end
     end
-    FileRule{T<:String}(files::Vector{T},step) = FileRule(String[f for f in files],step)
+    FileRule{T<:AbstractString}(files::Vector{T},step) = FileRule(AbstractString[f for f in files],step)
 
     function lower(s::ChangeDirectory,collection)
         if(!isempty(collection.steps))

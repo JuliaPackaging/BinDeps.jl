@@ -8,13 +8,13 @@ abstract DependencyHelper
 
 type PackageContext
     do_install::Bool
-    dir::String
-    package::String
+    dir::AbstractString
+    package::AbstractString
     deps::Vector{Any}
 end
 
 type LibraryDependency
-    name::String
+    name::AbstractString
     context::PackageContext
     providers::Vector{(DependencyProvider,Dict{Symbol,Any})}
     helpers::Vector{(DependencyHelper,Dict{Symbol,Any})}
@@ -23,7 +23,7 @@ type LibraryDependency
 end
 
 type LibraryGroup
-    name::String
+    name::AbstractString
     deps::Vector{LibraryDependency}
 end
 
@@ -84,7 +84,7 @@ macro setup()
         if length(ARGS) > 0 && isa(ARGS[1],BinDeps.PackageContext)
             bindeps_context = ARGS[1]
         else
-            bindeps_context = BinDeps.PackageContext(true,$dir,$package,{})
+            bindeps_context = BinDeps.PackageContext(true,$dir,$package,Any[])
         end
         library_group(args...) = BinDeps._library_group(bindeps_context,args...)
         library_dependency(args...; properties...) = BinDeps._library_dependency(bindeps_context,args...;properties...)
@@ -105,7 +105,7 @@ DEBIAN_VERSION_REGEX = r"^
 
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager 
-    package::String
+    package::AbstractString
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
@@ -141,7 +141,7 @@ libdir(p::AptGet,dep) = ["/usr/lib", "/usr/lib64", "/usr/lib32", "/usr/lib/x86_6
 
 const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
-    package::String
+    package::AbstractString
 end
 can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
@@ -170,7 +170,7 @@ pkg_name(y::Yum) = y.package
 # Note that `pacman --version` has an unreliable return value.
 const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
-    package::String
+    package::AbstractString
 end
 can_use(::Type{Pacman}) = has_pacman && OS_NAME == :Linux
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
@@ -221,7 +221,7 @@ type NetworkSource <: Sources
     uri::URI
 end
 
-srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,(Symbol=>Any)[])
+srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
 function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
@@ -231,7 +231,7 @@ type RemoteBinaries <: Binaries
 end
 
 type CustomPathBinaries <: Binaries
-    path::String
+    path::AbstractString
 end
 
 libdir(p::CustomPathBinaries,dep) = p.path
@@ -253,14 +253,14 @@ end
 
 lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelper(x.dep,Sources)...))
 
-Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
+Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}([k => v for (k,v) in opts]))
 
 export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
-provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
+provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
 provider(::Type{Binaries},uri::URI; opts...) = RemoteBinaries(uri)
-provider(::Type{Binaries},path::String; opts...) = CustomPathBinaries(path)
+provider(::Type{Binaries},path::AbstractString; opts...) = CustomPathBinaries(path)
 provider(::Type{SimpleBuild},steps; opts...) = SimpleBuild(steps)
 provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; opts...)
 provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection); opts...) = provider(SimpleBuild,steps; opts...)
@@ -349,7 +349,7 @@ function getoneprovider(dep::LibraryDependency,method)
 end
 
 function getallproviders(dep::LibraryDependency,method)
-    ret = {}
+    ret = Any[]
     for (p,opts) = dep.providers
         if typeof(p) <: method && can_use(typeof(p))
             push!(ret,(p,opts))
@@ -380,11 +380,13 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
-        h.source = (h.source,(Symbol=>Any)[])
+        h.source = (h.source,Dict{Symbol,Any}())
     end
     is(h.source[1], nothing) && error("Could not obtain sources for dependency $(dep.name)")
     steps = lower(generate_steps(dep,h.source...))
-    opts = {:srcdir=>srcdir(dep,h.source...), :prefix=>usrdir(dep), :builddir=>joinpath(builddir(dep),dep.name)}
+    opts = @compat Dict(:srcdir=>srcdir(dep,h.source...),
+                        :prefix=>usrdir(dep), 
+                        :builddir=>joinpath(builddir(dep),dep.name))
     merge!(opts,h.opts)
     if haskey(opts,:installed_libname)
         !haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
@@ -397,16 +399,16 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:libtarget] = ByteString[x*"."*dlext for x in dep.properties[:aliases]]
     end
     if !haskey(opts,:include_dirs)
-        opts[:include_dirs] = String[]
+        opts[:include_dirs] = AbstractString[]
     end
     if !haskey(opts,:lib_dirs)
-        opts[:lib_dirs] = String[]
+        opts[:lib_dirs] = AbstractString[]
     end
     if !haskey(opts,:pkg_config_dirs)
-        opts[:pkg_config_dirs] = String[]
+        opts[:pkg_config_dirs] = AbstractString[]
     end
     if !haskey(opts,:rpath_dirs)
-        opts[:rpath_dirs] = String[]
+        opts[:rpath_dirs] = AbstractString[]
     end
     if haskey(opts,:configure_subdir)
         opts[:srcdir] = joinpath(opts[:srcdir],opts[:configure_subdir])
@@ -446,7 +448,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
     for (p,opts) in providers
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-        paths = String[]
+        paths = AbstractString[]
 
         # Allow user to override installation path
         if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
@@ -491,7 +493,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
                 works = dep.libvalidate(lib,p)
                 dlclose(p)
                 if works
-                    push!(ret,((SystemPaths(),(Any=>Any)[]),lib))
+                    push!(ret,((SystemPaths(),Dict{Any,Any}()),lib))
                 end
             end
         end
@@ -552,7 +554,7 @@ if VERSION >= v"0.3-"
             end
             works = dep.libvalidate(libpath,handle)
             if works
-                push!(ret, ((SystemPaths(),(Any=>Any)[]), libpath))
+                push!(ret, ((SystemPaths(),Dict{Any,Any}()), libpath))
             end
         end
     end
@@ -657,7 +659,7 @@ function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
     providers = satisfied_providers(deps,allfl)
     p = nothing
     if isempty(providers)
-        return (Any=>Any)[]
+        return Dict{Any,Any}()
     else
         for p2 in providers
             if p2 <: provider
@@ -780,8 +782,8 @@ macro install (_libmaps...)
         push!(ret.args,
             esc(quote
                     load_cache = Dict()
-                    pre_hooks = Set{String}()
-                    load_hooks = Set{String}()
+                    pre_hooks = Set{AbstractString}()
+                    load_hooks = Set{AbstractString}()
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
@@ -862,7 +864,7 @@ macro load_dependencies(args...)
     if length(args) == 1 
         if isa(args[1],Expr)
             arg1 = eval(args[1])
-        elseif typeof(args[1]) <: String
+        elseif typeof(args[1]) <: AbstractString 
             file = args[1]
             dir = dirname(normpath(joinpath(dirname(file),"..")))
         elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
@@ -886,7 +888,7 @@ macro load_dependencies(args...)
             pkg = dir[(last(r)+2):end]
         end
     end
-    context = BinDeps.PackageContext(false,dir,pkg,{})
+    context = BinDeps.PackageContext(false,dir,pkg,Any[])
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)
@@ -897,7 +899,7 @@ macro load_dependencies(args...)
         end
         name = sym = dep.name
         if arg1 !== nothing
-            if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: String),eltype(arg1)))
+            if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: AbstractString),eltype(arg1)))
                 found = false
                 for need in keys(arg1)
                     found = (dep.name == string(need))
@@ -910,7 +912,7 @@ macro load_dependencies(args...)
                 if !found
                     continue
                 end
-            elseif isa(arg1,Vector) && ((eltype(arg1) == Symbol) || (eltype(arg1) <: String))
+            elseif isa(arg1,Vector) && ((eltype(arg1) == Symbol) || (eltype(arg1) <: AbstractString))
                 found = false
                 for i = 1:length(args)
                     found = (dep.name == string(arg1[i]))
@@ -953,10 +955,10 @@ macro load_dependencies(args...)
     ret
 end
 
-function build(pkg::String, method; dep::String="", force=false)
+function build(pkg::AbstractString, method; dep::AbstractString="", force=false)
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
-    context = BinDeps.PackageContext(false,dir,pkg,{})
+    context = BinDeps.PackageContext(false,dir,pkg,Any[])
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)

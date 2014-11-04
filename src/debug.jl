@@ -44,22 +44,22 @@ function show(io::IO, deps::LibraryGroup)
     end
 end
 
-function debug_context(pkg::String)
+function debug_context(pkg::AbstractString)
     info("Reading build script...")
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
-    context = BinDeps.PackageContext(false,dir,pkg,{})
+    context = BinDeps.PackageContext(false,dir,pkg,Any[])
     m = Module(:__anon__)
     body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
     eval(m,body)
     context
 end
 
-function debug(io,pkg::String)
+function debug(io,pkg::AbstractString)
     context = debug_context(pkg)
     println(io,"The package declares $(length(context.deps)) dependencies.")
     for dep in context.deps
         show(io,dep)
     end
 end
-debug(pkg::String) = debug(STDOUT,pkg)
+debug(pkg::AbstractString) = debug(STDOUT,pkg)
