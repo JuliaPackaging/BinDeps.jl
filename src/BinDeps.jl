@@ -18,12 +18,12 @@ module BinDeps
                 ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
                 return true
             end
-               
+
             dl = dlopen_e(filename)
             if dl != C_NULL
                 ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
                 return true
-            end                
+            end
         end
 
         dl = dlopen_e(libname)
@@ -95,15 +95,15 @@ module BinDeps
                 return (`7z x $file -y -o$directory`)
             end
             error("I don't know how to unpack $file")
-        end 
+        end
     end
 
     type SynchronousStepCollection
         steps::Vector{Any}
         cwd::String
         oldcwd::String
-        SynchronousStepCollection(cwd) = new({},cwd,cwd)
-        SynchronousStepCollection() = new({},"","")
+        SynchronousStepCollection(cwd) = new([],cwd,cwd)
+        SynchronousStepCollection() = new([],"","")
     end
 
     import Base.push!, Base.run, Base.(|)
@@ -145,10 +145,10 @@ module BinDeps
     	dir::String
     	targets::Vector{ASCIIString}
         env::Dict
-    	MakeTargets(dir,target;env = (String=>String)[]) = new(dir,target,env)
-    	MakeTargets(target::Vector{ASCIIString};env = (String=>String)[]) = new("",target,env)
-    	MakeTargets(target::ASCIIString;env = (String=>String)[]) = new("",[target],env)
-    	MakeTargets(;env = (String=>String)[]) = new("",ASCIIString[],env)
+    	MakeTargets(dir,target;env = Dict{String,String}()) = new(dir,target,env)
+    	MakeTargets(target::Vector{ASCIIString};env = Dict{String,String}()) = new("",target,env)
+    	MakeTargets(target::ASCIIString;env = Dict{String,String}()) = new("",[target],env)
+    	MakeTargets(;env = Dict{String,String}()) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -164,7 +164,7 @@ module BinDeps
     	config_status_dir::String
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], rpath_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+        AutotoolsDependency(;srcdir::String = "", prefix = "", builddir = "", configure_options=String[], libtarget = String[], include_dirs=String[], lib_dirs=String[], rpath_dirs=String[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) =
             new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:String[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
@@ -175,7 +175,7 @@ module BinDeps
         description::String
         step::SynchronousStepCollection
         Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
-    end 
+    end
 
     type Choices <: BuildStep
         choices::Vector{Choice}
@@ -282,7 +282,7 @@ module BinDeps
     dest(b::BuildStep) = b.dest
 
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
-    function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection) 
+    function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
     	if(a.cwd==b.cwd)
   		append!(a.steps,b.steps)
     	else
@@ -301,7 +301,7 @@ module BinDeps
         file::Array{String}
         step
         FileRule(file::String,step) = FileRule(String[file],step)
-    	function FileRule(files::Vector{String},step) 
+    	function FileRule(files::Vector{String},step)
             new(files,@build_steps (step,) )
     	end
     end
@@ -321,7 +321,7 @@ module BinDeps
     lower(s::Base.AbstractCmd,collection) = push!(collection,s)
     lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
     lower(s::ChecksumValidator,collection) = isempty(s.sha) || @dependent_steps ()->sha_check(s.path, s.sha)
-    function splittarpath(path) 
+    function splittarpath(path)
         path,extension = splitext(path)
         base_filename,secondary_extension = splitext(path)
         if extension == ".tgz" || extension == ".tbz" || extension == ".zip" && !isempty(secondary_extension)
@@ -339,14 +339,14 @@ module BinDeps
         end
     end
 
-    function adjust_env(env) 
+    function adjust_env(env)
         ret = similar(env)
         merge!(ret,ENV)
-        merge!(ret,env) #s.env overrides ENV 
+        merge!(ret,env) #s.env overrides ENV
         ret
     end
 
-    @unix_only function lower(a::MakeTargets,collection) 
+    @unix_only function lower(a::MakeTargets,collection)
         cmd = `make -j8`
         if(!isempty(a.dir))
             cmd = `$cmd -C $(a.dir)`
@@ -394,7 +394,7 @@ module BinDeps
         if s.force_rebuild
             @dependent_steps begin
                 RemoveDirectory(s.builddir)
-            end 
+            end
         end
 
         @unix_only @dependent_steps begin
