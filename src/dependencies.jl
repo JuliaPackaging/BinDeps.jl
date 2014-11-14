@@ -93,7 +93,7 @@ end
 
 export library_dependency, bindir, srcdir, usrdir, libdir
 
-library_dependency(args...; properties...) = error("No context provided. Did you forget `@Bindeps.setup`?")
+library_dependency(args...; properties...) = error("No context provided. Did you forget `@BinDeps.setup`?")
 
 abstract PackageManager <: DependencyProvider
 

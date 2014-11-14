@@ -79,6 +79,8 @@ module BinDeps
                 return (`tar xf $file --directory=$directory`)
             elseif extension == ".zip"
                 return (`unzip -x $file -d $directory`)
+            elseif extension == ".gz"
+                return (`mkdir $directory` & `cp $file $directory` & `gzip -dk $directory/$file`)
             end
             error("I don't know how to unpack $file")
         end
