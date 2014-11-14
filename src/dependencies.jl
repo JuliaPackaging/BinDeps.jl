@@ -199,6 +199,34 @@ pkg_name(p::Pacman) = p.package
 
 libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
+# Port is a package manager for OS X
+
+const has_port = try success(`port info julia`) catch e false end
+type Port <: PackageManager 
+    package::String
+end
+can_use(::Type{Port}) = has_port && OS_NAME == :Darwin
+package_available(p::Port) = can_use(Port) && !isempty(available_versions(p))
+function available_versions(p::Port)
+    vers = ASCIIString[]
+    for l in eachline(`port list $(p.package)`)
+        m = match(r"^(\S+)\s+@(\S+)\s+(\S+)$", l)
+        if m!=nothing
+            push!(vers, m.captures[2])
+        end
+    end
+    return vers
+end
+function available_version(p::Port)
+    vers = available_versions(p)
+    isempty(vers) && error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
+    length(vers) > 1 && warn("Multiple versions of $(p.package) are available. Use BinDeps.available_versions to get all versions.")
+    return vers[end]
+end
+pkg_name(a::Port) = a.package
+
+libdir(p::Port, dep) = ["/opt/local/lib"]
+
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
@@ -255,7 +283,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing,{k => v for (k,v) in opts})
 
-export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Pacman, Port, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -317,6 +345,18 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
         `sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
+    end
+end
+function generate_steps(dep::LibraryDependency,h::Port,opts)
+    if get(opts,:force_rebuild,false)
+        error("Will not force port to rebuild dependency \"$(dep.name)\".\n"*
+              "Please make any necessary adjustments manually (this might just be a version upgrade)")
+    end
+    @build_steps begin
+        println("Installing dependency $(h.package) via `sudo port install $(h.package)`:")
+        `sudo port install $(h.package)`
+        # ()->(ccall(:jl_read_sonames,Void,()))
+        ()->Void
     end
 end
 function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
@@ -809,17 +849,27 @@ macro install (_libmaps...)
 
                     # Generate "deps.jl" file for runtime loading
                     depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
+                    println(depsfile,
+                        """
+                        # This is an auto-generated file; do not edit
+                        """)
+                    println(depsfile, "# Pre-hooks")
                     println(depsfile, join(pre_hooks, "\n"))
                     println(depsfile,
                         """
+                        # Macro to load a library
                         macro checked_lib(libname, path)
                             (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
                             quote const \$(esc(libname)) = \$path end
-                        end""")
+                        end
+                        """)
+                    println(depsfile, "# Load dependencies")
                     for libkey in keys($libmaps)
                         ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
                         println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
                     end
+                    println(depsfile)
+                    println(depsfile, "# Load-hooks")
                     println(depsfile, join(load_hooks,"\n"))
                     close(depsfile)
                 end))
