@@ -809,17 +809,27 @@ macro install (_libmaps...)
 
                     # Generate "deps.jl" file for runtime loading
                     depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
+                    println(depsfile,
+                        """
+                        # This is an auto-generated file; do not edit
+                        """)
+                    println(depsfile, "# Pre-hooks")
                     println(depsfile, join(pre_hooks, "\n"))
                     println(depsfile,
                         """
+                        # Macro to load a library
                         macro checked_lib(libname, path)
                             (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
                             quote const \$(esc(libname)) = \$path end
-                        end""")
+                        end
+                        """)
+                    println(depsfile, "# Load dependencies")
                     for libkey in keys($libmaps)
                         ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
                         println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
                     end
+                    println(depsfile)
+                    println(depsfile, "# Load-hooks")
                     println(depsfile, join(load_hooks,"\n"))
                     close(depsfile)
                 end))
