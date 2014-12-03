@@ -102,8 +102,8 @@ module BinDeps
         steps::Vector{Any}
         cwd::String
         oldcwd::String
-        SynchronousStepCollection(cwd) = new({},cwd,cwd)
-        SynchronousStepCollection() = new({},"","")
+        SynchronousStepCollection(cwd) = new(Any[],cwd,cwd)
+        SynchronousStepCollection() = new(Any[],"","")
     end
 
     import Base.push!, Base.run, Base.(|)
@@ -142,13 +142,13 @@ module BinDeps
 
 
     type MakeTargets <: BuildStep
-    	dir::String
-    	targets::Vector{ASCIIString}
+        dir::String
+        targets::Vector{ASCIIString}
         env::Dict
-    	MakeTargets(dir,target;env = (String=>String)[]) = new(dir,target,env)
-    	MakeTargets(target::Vector{ASCIIString};env = (String=>String)[]) = new("",target,env)
-    	MakeTargets(target::ASCIIString;env = (String=>String)[]) = new("",[target],env)
-    	MakeTargets(;env = (String=>String)[]) = new("",ASCIIString[],env)
+        MakeTargets(dir,target;env = Dict{String,String}()) = new(dir,target,env)
+        MakeTargets(target::Vector{ASCIIString};env = Dict{String,String}()) = new("",target,env)
+        MakeTargets(target::ASCIIString;env = Dict{String,String}()) = new("",[target],env)
+        MakeTargets(;env = Dict{String,String}()) = new("",ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
