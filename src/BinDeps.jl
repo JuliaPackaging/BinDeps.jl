@@ -45,7 +45,7 @@ module BinDeps
     function download_cmd(url::String, filename::String)
         global downloadcmd
         if downloadcmd === nothing
-            for checkcmd in (:curl, :wget, :fetch)
+            for checkcmd in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
                 try
                     if success(`$checkcmd --help`)
                         downloadcmd = checkcmd
@@ -62,6 +62,8 @@ module BinDeps
             return `curl -o $filename -L $url`
         elseif downloadcmd == :fetch
             return `fetch -f $filename $url`
+        elseif downloadcmd == :powershell
+            return `powershell -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
         else
             error("No download agent available; install curl, wget, or fetch.")
         end
