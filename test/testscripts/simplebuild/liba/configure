@@ -1,9 +1,17 @@
 touch config.status
 cat <<EOF > Makefile
-all: liba.dylib
-liba.dylib:
-	clang -shared ../../src/liba/liba.c -o liba.dylib
-install: liba.dylib
+ifeq (\$(OS), Darwin)
+     SHLIB_EXT = dylib
+     CC = clang
+else
+     SHLIB_EXT = so
+     CC = gcc
+endif
+
+all: liba.\$(SHLIB_EXT)
+liba.\$(SHLIB_EXT):
+	\$(CC) -shared ../../src/liba/liba.c -o liba.\$(SHLIB_EXT)
+install: liba.\$(SHLIB_EXT)
 	mkdir -p ../../usr/lib
-	cp liba.dylib ../../usr/lib
+	cp liba.\$(SHLIB_EXT) ../../usr/lib
 EOF
