@@ -23,7 +23,7 @@ deps = [
     liba = library_dependency("liba", aliases = ["liba","liba1","liba.1"])
 ]
 
-provides(Sources,testuri,liba,SHA="7144ab4215ffe96b28d954b68e02b84b61a3e5b6aa078bf036cafc45b1cfe3aa")
+provides(Sources,testuri,liba)#,SHA="7144ab4215ffe96b28d954b68e02b84b61a3e5b6aa078bf036cafc45b1cfe3aa")
 provides(BuildProcess,Autotools(libtarget = "liba.$shlib_ext"),liba)
 
 @BinDeps.install [:liba => :jl_liba]
