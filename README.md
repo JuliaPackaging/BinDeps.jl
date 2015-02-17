@@ -195,6 +195,10 @@ There are also several builtin options. Some of them are:
  	If the provider installs a library dependency to someplace other than the
  	standard search paths, that location can be specified here.
 
+ * `SHA = "sha"`
+
+  Provides a SHA-256 checksum to validate a downloaded source or binary file against.
+
 # The high level interface - built in providers
 
 We have already seen the `AptGet`, and `Yum` providers, which all take a string naming the package as their data argument. The other build-in providers are:

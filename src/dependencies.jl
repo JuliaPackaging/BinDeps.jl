@@ -978,12 +978,14 @@ function build(pkg::String, method; dep::String="", force=false)
     end
 end
 
-# Calculate the SHA-512 hash of a file
+# Calculate the SHA-256 hash of a file
 using SHA
 
 function sha_check(path, sha)
-    calc_sha = sha256(open(path))
-    if calc_sha != sha
-        error("Checksum mismatch!  Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again")
+    open(path) do f
+        calc_sha = sha256(f)
+        if calc_sha != sha
+            error("Checksum mismatch!  Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again")
+        end
     end
 end
