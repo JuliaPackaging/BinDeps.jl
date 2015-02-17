@@ -468,20 +468,26 @@ function _find_library(dep::LibraryDependency; provider = Any)
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
-            h = dlopen_e(l, RTLD_LAZY)
-            if h != C_NULL
-                works = dep.libvalidate(l,h)
-                if VERSION >= v"0.3-"
-                    l = Sys.dlpath(h)
-                end
-                dlclose(h)
-                if works
-                    push!(ret, ((p, opts), l))
-                else
-                    # We tried to load this providers' library, but it didn't satisfy
-                    # the requirements, so tell it to force a rebuild since the requirements
-                    # have most likely changed
-                    opts[:force_rebuild] = true
+            if isfile(l) || isfile(l * "." * Sys.shlib_ext)
+                try
+                    h = dlopen(l, RTLD_LAZY)
+                    works = dep.libvalidate(l,h)
+                    if VERSION >= v"0.3-"
+                        l = Sys.dlpath(h)
+                    end
+                    dlclose(h)
+                    if works
+                        push!(ret, ((p, opts), l))
+                    else
+                        # We tried to load this providers' library, but it didn't satisfy
+                        # the requirements, so tell it to force a rebuild since the requirements
+                        # have most likely changed
+                        opts[:force_rebuild] = true
+                    end
+                catch err
+                    buf = PipeBuffer()
+                    showerror(buf, err)
+                    warn("dlopen($l) failed, error was: $(readall(buf))")
                 end
             end
         end
