@@ -4,7 +4,7 @@ module BinDeps
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
             Choice, Choices, CCompile, FileDownloader, FileRule,
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
-            autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
+            autotools_install, CreateDirectory, MakeTargets, SystemLibInstall, include_deps
 
     const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)

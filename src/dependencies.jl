@@ -767,7 +767,7 @@ end
 
 execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
 
-macro install (_libmaps...)
+macro install (pkgname, _libmaps...)
     if length(_libmaps) == 0
         return esc(quote
             if bindeps_context.do_install
@@ -822,8 +822,16 @@ macro install (_libmaps...)
                         """
                         # Macro to load a library
                         macro checked_lib(libname, path)
-                            (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
-                            quote const \$(esc(libname)) = \$path end
+                            if dlopen_e(path) == C_NULL
+                                depsfile = joinpath(Pkg.dir(pkgname), "deps/deps.jl")
+                                if myid() != 1 && isfile(depsfile)
+                                    path = eval(include_string(readall(depsfile)))
+                                else
+                                    error("Unable to load \\n\\n\$libname (\$path) on $(gethostname())\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
+                                end
+                            else
+                                quote const \$(esc(libname)) = \$path end
+                            end
                         end
                         """)
                     println(depsfile, "# Load dependencies")
@@ -975,6 +983,15 @@ function build(pkg::String, method; dep::String="", force=false)
     eval(m,body)
     for d in context.deps
         BinDeps.satisfy!(d,[method])
+    end
+end
+
+function include_deps(pkg::String)
+    depsfile = joinpath(Pkg.dir(pkg),"deps/deps.jl")
+    if isfile(depsfile)
+        include_string(readall(depsfile))
+    else
+        error("$pkg not properly installed. Please run Pkg.build(\"$pkg\")")
     end
 end
 
