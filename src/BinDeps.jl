@@ -88,7 +88,7 @@ module BinDeps
             elseif extension == ".zip"
                 return (`unzip -x $file -d $directory`)
             elseif extension == ".gz"
-                return (`mkdir $directory` |> `cp $file $directory` |> `gzip -dk $directory/$file`)
+                return (`mkdir $directory` |> `cp $file $directory` |> `gzip -d $directory/$file`)
             end
             error("I don't know how to unpack $file")
         end
