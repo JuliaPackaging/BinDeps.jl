@@ -6,7 +6,13 @@ module BinDeps
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
             autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
-    const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
+    if VERSION >= v"0.4.0-dev+3844"
+        import Base.Libdl: dlext, dlpath, RTLD_LAZY, DL_LOAD_PATH
+    else
+        const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
+        dlpath = Sys.dlpath
+        DL_LOAD_PATH = Base.DL_LOAD_PATH
+    end
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
     function find_library(pkg,libname,files)

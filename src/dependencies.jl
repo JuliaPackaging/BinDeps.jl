@@ -472,7 +472,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             if h != C_NULL
                 works = dep.libvalidate(l,h)
                 if VERSION >= v"0.3-"
-                    l = Sys.dlpath(h)
+                    l = dlpath(h)
                 end
                 dlclose(h)
                 if works
@@ -504,7 +504,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             # We don't want to use regular dlopen, because we want to get at
             # system libraries even if one of our providers is higher in the
             # DL_LOAD_PATH
-            for path in Base.DL_LOAD_PATH
+            for path in DL_LOAD_PATH
                 for ext in EXTENSIONS
                     opath = string(joinpath(path,lib),ext)
                     check_path!(ret,dep,opath)
@@ -537,7 +537,7 @@ if VERSION >= v"0.3-"
 
     function check_system_handle!(ret,dep,handle)
         if handle != C_NULL
-            libpath = Sys.dlpath(handle)
+            libpath = dlpath(handle)
             # Check that this is not a duplicate
             for p in ret
                 try
