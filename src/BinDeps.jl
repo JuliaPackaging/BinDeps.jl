@@ -11,7 +11,6 @@ module BinDeps
     else
         const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
         dlpath = Sys.dlpath
-        DL_LOAD_PATH = Base.DL_LOAD_PATH
     end
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
