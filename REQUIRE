@@ -1,3 +1,4 @@
 julia 0.2-
-URIParser
-SHA
+URIParser 0.0.5
+SHA 0.0.4
+Compat 0.3.6
