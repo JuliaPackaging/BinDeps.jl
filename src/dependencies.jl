@@ -100,11 +100,11 @@ abstract PackageManager <: DependencyProvider
 DEBIAN_VERSION_REGEX = r"^
     ([0-9]+\:)?                                           # epoch
     (?:(?:([0-9][a-z0-9.\-+:~]*)-([0-9][a-z0-9.+~]*)) |   # upstream version + debian revision
-          ([0-9][a-z0-9.+:~]*))                           # upstream version 
+          ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
 const has_apt = try success(`apt-get -v`) catch e false end
-type AptGet <: PackageManager 
+type AptGet <: PackageManager
     package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
@@ -222,7 +222,7 @@ type NetworkSource <: Sources
 end
 
 srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
-function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
+function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
@@ -269,9 +269,9 @@ provider(::Type{Autotools},a::Autotools; opts...) = a
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
-function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...) 
+function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...)
     p = provider(T,ps; opts...)
-    for dep in deps 
+    for dep in deps
         provides(p,dep; opts...)
     end
 end
@@ -328,7 +328,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
         FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
     end
 end
-function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts) 
+function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
     localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
     steps = @build_steps begin
@@ -376,7 +376,7 @@ function generate_steps(dep::LibraryDependency,method)
 end
 
 function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
-    if is(h.source, nothing) 
+    if is(h.source, nothing)
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
@@ -394,10 +394,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:installed_libpath] = ByteString[joinpath(libdir(dep),opts[:installed_libname])]
         delete!(opts, :installed_libname)
     elseif !haskey(opts,:installed_libpath)
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in get(dep.properties,:aliases,ByteString[])]
+        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."* (@compat Libdl.dlext) for x in get(dep.properties,:aliases,ByteString[])]
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
-        opts[:libtarget] = ByteString[x*"."*dlext for x in dep.properties[:aliases]]
+        opts[:libtarget] = ByteString[x * "." * (@compat Libdl.dlext) for x in dep.properties[:aliases]]
     end
     if !haskey(opts,:include_dirs)
         opts[:include_dirs] = String[]
@@ -446,7 +446,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     # Same as find_library, but with extra check defined by dep
     libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
     # Make sure we keep the defaults first, but also look in the other directories
-    providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
+    providers = unique(vcat(reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers))
     for (p,opts) in providers
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = String[]
@@ -468,13 +468,13 @@ function _find_library(dep::LibraryDependency; provider = Any)
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
-            h = dlopen_e(l, RTLD_LAZY)
+            h = @compat Libdl.dlopen_e(l, (@compat Libdl.RTLD_LAZY))
             if h != C_NULL
                 works = dep.libvalidate(l,h)
                 if VERSION >= v"0.3-"
-                    l = dlpath(h)
+                    l = @compat Libdl.dlpath(h)
                 end
-                dlclose(h)
+                @compat Libdl.dlclose(h)
                 if works
                     push!(ret, ((p, opts), l))
                 else
@@ -489,7 +489,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     # 0.2 compatibility
     if VERSION < v"0.3-"
         for lib in libnames
-            p = dlopen_e(lib, RTLD_LAZY)
+            p = dlopen_e(lib, (@compat Libdl.RTLD_LAZY))
             if p != C_NULL
                 works = dep.libvalidate(lib,p)
                 dlclose(p)
@@ -504,7 +504,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             # We don't want to use regular dlopen, because we want to get at
             # system libraries even if one of our providers is higher in the
             # DL_LOAD_PATH
-            for path in DL_LOAD_PATH
+            for path in (@compat Libdl.DL_LOAD_PATH)
                 for ext in EXTENSIONS
                     opath = string(joinpath(path,lib),ext)
                     check_path!(ret,dep,opath)
@@ -525,19 +525,19 @@ end
 
 if VERSION >= v"0.3-"
     function check_path!(ret,dep,opath)
-        flags = RTLD_LAZY
-        handle = c_malloc(2*sizeof(Ptr{Void}))
+        flags = @compat Libdl.RTLD_LAZY
+        handle = @compat Libc.malloc(2*sizeof(Ptr{Void}))
         err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
         if err == 0
             check_system_handle!(ret,dep,handle)
-            dlclose(handle)
-            c_free(handle)
+            @compat Libdl.dlclose(handle)
+            @compat Libc.free(handle)
         end
     end
 
     function check_system_handle!(ret,dep,handle)
         if handle != C_NULL
-            libpath = dlpath(handle)
+            libpath = @compat Libdl.dlpath(handle)
             # Check that this is not a duplicate
             for p in ret
                 try
@@ -822,7 +822,7 @@ macro install (_libmaps...)
                         """
                         # Macro to load a library
                         macro checked_lib(libname, path)
-                            (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
+                            ($(VERSION < v"0.4.0-dev+3844" ? "dlopen_e(path)" : "Libdl.dlopen_e(path)") == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
                             quote const \$(esc(libname)) = \$path end
                         end
                         """)
@@ -852,7 +852,7 @@ end
 # the name of the global variable to be set to the result of the lookup.
 # The second argument may be as follows:
 #
-#  1. Vector{Symbol} or Vector{T <: String} 
+#  1. Vector{Symbol} or Vector{T <: String}
 #       Only load that are declared whose name is listed in the Array
 #       E.g. @load_dependencies "file.jl" [:cairo, :tk]
 #
@@ -862,7 +862,7 @@ end
 #       E.g. @load_dependencies "file.jl" [:cairo=>:libcairo, :tk=>:libtk]
 #       will assign the result of the lookup for :cairo and :tk to the variables `libcairo` and `libtk`
 #       respectively.
-# 
+#
 #  3. Function
 #       A filter function
 #       E.g. @load_dependencies "file.jl" x->x=="tk"
@@ -872,7 +872,7 @@ macro load_dependencies(args...)
     dir = dirname(normpath(joinpath(dirname(Base.source_path()),"..")))
     arg1 = nothing
     file = "../deps/build.jl"
-    if length(args) == 1 
+    if length(args) == 1
         if isa(args[1],Expr)
             arg1 = eval(args[1])
         elseif typeof(args[1]) <: String
