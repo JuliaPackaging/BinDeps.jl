@@ -1,37 +1,33 @@
 module BinDeps
     importall Base
-
+    using Compat
+    
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
             Choice, Choices, CCompile, FileDownloader, FileRule,
             ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
             autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
-    if VERSION >= v"0.4.0-dev+3844"
-        import Base.Libdl: dlext, dlpath, RTLD_LAZY, DL_LOAD_PATH
-    else
-        const dlext = isdefined(Base.Sys, :shlib_ext) ? Base.Sys.shlib_ext : Base.Sys.dlext # Julia 0.2/0.3 compatibility
-        dlpath = Sys.dlpath
-    end
+    const dlext = Libdl.dlext
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
     function find_library(pkg,libname,files)
         Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
         dl = C_NULL
         for filename in files
-            dl = dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
+            dl = Libdl.dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
             if dl != C_NULL
                 ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
                 return true
             end
                
-            dl = dlopen_e(filename)
+            dl = Libdl.dlopen_e(filename)
             if dl != C_NULL
                 ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
                 return true
             end                
         end
 
-        dl = dlopen_e(libname)
+        dl = Libdl.dlopen_e(libname)
         dl != C_NULL ? true : false
     end
 

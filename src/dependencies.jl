@@ -446,7 +446,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     # Same as find_library, but with extra check defined by dep
     libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
     # Make sure we keep the defaults first, but also look in the other directories
-    providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]),dep.providers])
+    providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]);dep.providers])
     for (p,opts) in providers
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = String[]
@@ -468,13 +468,13 @@ function _find_library(dep::LibraryDependency; provider = Any)
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
-            h = dlopen_e(l, RTLD_LAZY)
+            h = Libdl.dlopen_e(l, Libdl.RTLD_LAZY)
             if h != C_NULL
                 works = dep.libvalidate(l,h)
                 if VERSION >= v"0.3-"
-                    l = dlpath(h)
+                    l = Libdl.dlpath(h)
                 end
-                dlclose(h)
+                Libdl.dlclose(h)
                 if works
                     push!(ret, ((p, opts), l))
                 else
@@ -489,10 +489,10 @@ function _find_library(dep::LibraryDependency; provider = Any)
     # 0.2 compatibility
     if VERSION < v"0.3-"
         for lib in libnames
-            p = dlopen_e(lib, RTLD_LAZY)
+            p = Libdl.dlopen_e(lib, Libdl.RTLD_LAZY)
             if p != C_NULL
                 works = dep.libvalidate(lib,p)
-                dlclose(p)
+                Libdl.dlclose(p)
                 if works
                     push!(ret,((SystemPaths(),Dict()),lib))
                 end
@@ -504,7 +504,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             # We don't want to use regular dlopen, because we want to get at
             # system libraries even if one of our providers is higher in the
             # DL_LOAD_PATH
-            for path in DL_LOAD_PATH
+            for path in Libdl.DL_LOAD_PATH
                 for ext in EXTENSIONS
                     opath = string(joinpath(path,lib),ext)
                     check_path!(ret,dep,opath)
@@ -525,19 +525,19 @@ end
 
 if VERSION >= v"0.3-"
     function check_path!(ret,dep,opath)
-        flags = RTLD_LAZY
-        handle = c_malloc(2*sizeof(Ptr{Void}))
+        flags = Libdl.RTLD_LAZY
+        handle = Libc.malloc(2*sizeof(Ptr{Void}))
         err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
         if err == 0
             check_system_handle!(ret,dep,handle)
-            dlclose(handle)
-            c_free(handle)
+            Libdl.dlclose(handle)
+            Libc.free(handle)
         end
     end
 
     function check_system_handle!(ret,dep,handle)
         if handle != C_NULL
-            libpath = dlpath(handle)
+            libpath = Libdl.dlpath(handle)
             # Check that this is not a duplicate
             for p in ret
                 try
@@ -822,7 +822,7 @@ macro install (_libmaps...)
                         """
                         # Macro to load a library
                         macro checked_lib(libname, path)
-                            (dlopen_e(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
+                            ((VERSION >= v"0.4.0-dev+3844" ? Base.Libdl.dlopen_e : dlopen_e)(path) == C_NULL) && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
                             quote const \$(esc(libname)) = \$path end
                         end
                         """)
