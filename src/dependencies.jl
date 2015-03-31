@@ -1,9 +1,9 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 
-# A dependency provider, if succcessfully exectued will satisfy the dependency
+# A dependency provider, if successfully executed will satisfy the dependency
 abstract DependencyProvider
 
-# A library helper may be used by `DependencyProvider`s but will by iteself not provide the library
+# A library helper may be used by `DependencyProvider`s but will by itself not provide the library
 abstract DependencyHelper
 
 type PackageContext
@@ -100,11 +100,11 @@ abstract PackageManager <: DependencyProvider
 DEBIAN_VERSION_REGEX = r"^
     ([0-9]+\:)?                                           # epoch
     (?:(?:([0-9][a-z0-9.\-+:~]*)-([0-9][a-z0-9.+~]*)) |   # upstream version + debian revision
-          ([0-9][a-z0-9.+:~]*))                           # upstream version 
+          ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
 const has_apt = try success(`apt-get -v`) catch e false end
-type AptGet <: PackageManager 
+type AptGet <: PackageManager
     package::String
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
@@ -222,7 +222,7 @@ type NetworkSource <: Sources
 end
 
 srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
-function srcdir( dep::LibraryDependency, s::NetworkSource,opts) 
+function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
@@ -269,9 +269,9 @@ provider(::Type{Autotools},a::Autotools; opts...) = a
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
-function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...) 
+function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...)
     p = provider(T,ps; opts...)
-    for dep in deps 
+    for dep in deps
         provides(p,dep; opts...)
     end
 end
@@ -328,7 +328,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
         FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
     end
 end
-function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts) 
+function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
     localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
     steps = @build_steps begin
@@ -376,7 +376,7 @@ function generate_steps(dep::LibraryDependency,method)
 end
 
 function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
-    if is(h.source, nothing) 
+    if is(h.source, nothing)
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
@@ -852,7 +852,7 @@ end
 # the name of the global variable to be set to the result of the lookup.
 # The second argument may be as follows:
 #
-#  1. Vector{Symbol} or Vector{T <: String} 
+#  1. Vector{Symbol} or Vector{T <: String}
 #       Only load that are declared whose name is listed in the Array
 #       E.g. @load_dependencies "file.jl" [:cairo, :tk]
 #
@@ -862,7 +862,7 @@ end
 #       E.g. @load_dependencies "file.jl" [:cairo=>:libcairo, :tk=>:libtk]
 #       will assign the result of the lookup for :cairo and :tk to the variables `libcairo` and `libtk`
 #       respectively.
-# 
+#
 #  3. Function
 #       A filter function
 #       E.g. @load_dependencies "file.jl" x->x=="tk"
@@ -872,7 +872,7 @@ macro load_dependencies(args...)
     dir = dirname(normpath(joinpath(dirname(Base.source_path()),"..")))
     arg1 = nothing
     file = "../deps/build.jl"
-    if length(args) == 1 
+    if length(args) == 1
         if isa(args[1],Expr)
             arg1 = eval(args[1])
         elseif typeof(args[1]) <: String
