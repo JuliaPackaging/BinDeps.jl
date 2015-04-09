@@ -251,7 +251,8 @@ initialization process of your package to load all declared libraries in your bu
 file. 
 
 The basic usage is very simple:
-```
+
+```jl
 using BinDeps
 @BinDeps.load_dependencies
 ```
@@ -286,25 +287,25 @@ which will assign the result to the `_foo` and `_bar` variables instead.
    The low level interface provides a number of utilities to write cross platform 
    build scripts. It looks something like this (from the Cairo build script):
 
-	```julia
+```jl
+	@build_steps begin
+		GetSources(libpng)
+		CreateDirectory(pngbuilddir)
 		@build_steps begin
-			GetSources(libpng)
-			CreateDirectory(pngbuilddir)
-			@build_steps begin
-				ChangeDirectory(pngbuilddir)
-				FileRule(joinpath(prefix,"lib","libpng15.dll"),@build_steps begin
-					`cmake -DCMAKE_INSTALL_PREFIX="$prefix" -G"MSYS Makefiles" $pngsrcdir`
-					`make`
-					`cp libpng*.dll $prefix/lib`
-					`cp libpng*.a $prefix/lib`
-					`cp libpng*.pc $prefix/lib/pkgconfig`
-					`cp pnglibconf.h $prefix/include`
-					`cp $pngsrcdir/png.h $prefix/include`
-					`cp $pngsrcdir/pngconf.h $prefix/include`
-				end)
-			end
+			ChangeDirectory(pngbuilddir)
+			FileRule(joinpath(prefix,"lib","libpng15.dll"),@build_steps begin
+				`cmake -DCMAKE_INSTALL_PREFIX="$prefix" -G"MSYS Makefiles" $pngsrcdir`
+				`make`
+				`cp libpng*.dll $prefix/lib`
+				`cp libpng*.a $prefix/lib`
+				`cp libpng*.pc $prefix/lib/pkgconfig`
+				`cp pnglibconf.h $prefix/include`
+				`cp $pngsrcdir/png.h $prefix/include`
+				`cp $pngsrcdir/pngconf.h $prefix/include`
+			end)
 		end
-	```
+	end
+```
 
 
     All the steps are executed synchronously. The result of the `@build_steps` macro 
@@ -320,7 +321,7 @@ which will assign the result to the `_foo` and `_bar` variables instead.
 
   * FileUnpacker(local_file,folder)
 
-    Unpack the file `local_file` into the folder `folder`
+    	Unpack the file `local_file` into the folder `folder`
 
   * AutotoolsDependency(opts...)
 
