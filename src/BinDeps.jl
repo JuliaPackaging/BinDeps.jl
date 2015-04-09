@@ -60,7 +60,7 @@ module BinDeps
         if downloadcmd == :wget
             return `wget -O $filename $url`
         elseif downloadcmd == :curl
-            return `curl -o $filename -L $url`
+            return `curl -f -o $filename -L $url`
         elseif downloadcmd == :fetch
             return `fetch -f $filename $url`
         elseif downloadcmd == :powershell
