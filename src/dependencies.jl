@@ -531,7 +531,6 @@ if VERSION >= v"0.3-"
         if err == 0
             check_system_handle!(ret,dep,handle)
             Libdl.dlclose(handle)
-            Libc.free(handle)
         end
     end
 
