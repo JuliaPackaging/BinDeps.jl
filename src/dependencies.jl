@@ -16,8 +16,8 @@ end
 type LibraryDependency
     name::String
     context::PackageContext
-    providers::Vector{(DependencyProvider,Dict{Symbol,Any})}
-    helpers::Vector{(DependencyHelper,Dict{Symbol,Any})}
+    providers::Vector{@compat Tuple{DependencyProvider,Dict{Symbol,Any}}}
+    helpers::Vector{@compat Tuple{DependencyHelper,Dict{Symbol,Any}}}
     properties::Dict{Symbol,Any}
     libvalidate::Function
 end
@@ -61,7 +61,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array((DependencyProvider,Dict{Symbol,Any}),0),Array((DependencyHelper,Dict{Symbol,Any}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
+    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
     if group !== nothing
         push!(group.deps,r)
     else
