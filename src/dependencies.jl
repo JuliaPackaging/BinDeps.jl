@@ -531,6 +531,10 @@ if VERSION >= v"0.3-"
         if err == 0
             check_system_handle!(ret,dep,handle)
             Libdl.dlclose(handle)
+            # in Julia 0.4 handle is freed by dlclose.
+            if VERSION < v"0.4-"
+                c_free(handle)
+            end
         end
     end
 
