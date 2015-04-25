@@ -210,7 +210,7 @@ abstract Binaries <: DependencyProvider
 # indicates the library was found somewhere on the
 # system using dlopen.
 #
-immutable SystemPaths <: Binaries; end
+immutable SystemPaths <: DependencyProvider; end
 
 show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
@@ -796,18 +796,22 @@ macro install (_libmaps...)
                                 if !isempty(libs)
                                     for dep in d.deps
                                         !BinDeps.applicable(dep) && continue
-                                        load_cache[dep.name] = libs[dep][2]
-                                        opts = libs[dep][1][2]
-                                        haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
-                                        haskey(opts, :onload) && push!(load_hooks,opts[:onload])
+                                        if !haskey(load_cache, dep.name)
+                                            load_cache[dep.name] = libs[dep][2]
+                                            opts = libs[dep][1][2]
+                                            haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
+                                            haskey(opts, :onload) && push!(load_hooks,opts[:onload])
+                                        end
                                     end
                                 end
                             else
                                 for (k,v) in libs
-                                    load_cache[d.name] = v
-                                    opts = k[2]
-                                    haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
-                                    haskey(opts, :onload) && push!(load_hooks,opts[:onload])
+                                    if !haskey(load_cache, d.name)
+                                        load_cache[d.name] = v
+                                        opts = k[2]
+                                        haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
+                                        haskey(opts, :onload) && push!(load_hooks,opts[:onload])
+                                    end
                                 end
                             end
                         end
