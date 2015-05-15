@@ -471,9 +471,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             h = Libdl.dlopen_e(l, Libdl.RTLD_LAZY)
             if h != C_NULL
                 works = dep.libvalidate(l,h)
-                if VERSION >= v"0.3-"
-                    l = Libdl.dlpath(h)
-                end
+                l = Libdl.dlpath(h)
                 Libdl.dlclose(h)
                 if works
                     push!(ret, ((p, opts), l))
@@ -486,80 +484,64 @@ function _find_library(dep::LibraryDependency; provider = Any)
             end
         end
     end
-    # 0.2 compatibility
-    if VERSION < v"0.3-"
-        for lib in libnames
-            p = Libdl.dlopen_e(lib, Libdl.RTLD_LAZY)
-            if p != C_NULL
-                works = dep.libvalidate(lib,p)
-                Libdl.dlclose(p)
-                if works
-                    push!(ret,((SystemPaths(),Dict()),lib))
-                end
-            end
-        end
-    else
-        # Now check system libraries
-        for lib in libnames
-            # We don't want to use regular dlopen, because we want to get at
-            # system libraries even if one of our providers is higher in the
-            # DL_LOAD_PATH
-            for path in Libdl.DL_LOAD_PATH
-                for ext in EXTENSIONS
-                    opath = string(joinpath(path,lib),ext)
-                    check_path!(ret,dep,opath)
-                end
-            end
+    # Now check system libraries
+    for lib in libnames
+        # We don't want to use regular dlopen, because we want to get at
+        # system libraries even if one of our providers is higher in the
+        # DL_LOAD_PATH
+        for path in Libdl.DL_LOAD_PATH
             for ext in EXTENSIONS
-                opath = string(lib,ext)
+                opath = string(joinpath(path,lib),ext)
                 check_path!(ret,dep,opath)
             end
-            @linux_only begin
-                soname = ccall(:jl_lookup_soname, Ptr{Uint8}, (Ptr{Uint8}, Csize_t), lib, sizeof(lib))
-                soname != C_NULL && check_path!(ret,dep,bytestring(soname))
-            end
+        end
+        for ext in EXTENSIONS
+            opath = string(lib,ext)
+            check_path!(ret,dep,opath)
+        end
+        @linux_only begin
+            soname = ccall(:jl_lookup_soname, Ptr{Uint8}, (Ptr{Uint8}, Csize_t), lib, sizeof(lib))
+            soname != C_NULL && check_path!(ret,dep,bytestring(soname))
         end
     end
     return ret
 end
 
-if VERSION >= v"0.3-"
-    function check_path!(ret,dep,opath)
-        flags = Libdl.RTLD_LAZY
-        handle = Libc.malloc(2*sizeof(Ptr{Void}))
-        err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
-        if err == 0
-            check_system_handle!(ret,dep,handle)
-            Libdl.dlclose(handle)
-            # in Julia 0.4 handle is freed by dlclose.
-            if VERSION < v"0.4-"
-                c_free(handle)
-            end
+function check_path!(ret,dep,opath)
+    flags = Libdl.RTLD_LAZY
+    handle = Libc.malloc(2*sizeof(Ptr{Void}))
+    err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
+    if err == 0
+        check_system_handle!(ret,dep,handle)
+        Libdl.dlclose(handle)
+        # in Julia 0.4 handle is freed by dlclose.
+        if VERSION < v"0.4-"
+            c_free(handle)
         end
     end
+end
 
-    function check_system_handle!(ret,dep,handle)
-        if handle != C_NULL
-            libpath = Libdl.dlpath(handle)
-            # Check that this is not a duplicate
-            for p in ret
-                try
-                    if realpath(p[2]) == realpath(libpath)
-                        return
-                    end
-                catch
-                    warn("""
-                        Found a library that does not exist.
-                        This may happen if the library has an active open handle.
-                        Please quit julia and try again.
-                        """)
+function check_system_handle!(ret,dep,handle)
+    if handle != C_NULL
+        libpath = Libdl.dlpath(handle)
+        # Check that this is not a duplicate
+        for p in ret
+            try
+                if realpath(p[2]) == realpath(libpath)
                     return
                 end
+            catch
+                warn("""
+                    Found a library that does not exist.
+                    This may happen if the library has an active open handle.
+                    Please quit julia and try again.
+                    """)
+                return
             end
-            works = dep.libvalidate(libpath,handle)
-            if works
-                push!(ret, ((SystemPaths(),Dict()), libpath))
-            end
+        end
+        works = dep.libvalidate(libpath,handle)
+        if works
+            push!(ret, ((SystemPaths(),Dict()), libpath))
         end
     end
 end
