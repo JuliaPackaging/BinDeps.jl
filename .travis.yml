@@ -7,7 +7,3 @@ julia:
     - nightly
 notifications:
     email: false
-script:
-    - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-    - julia -e 'Pkg.clone(pwd()); Pkg.build("BinDeps"); Pkg.add("Morsel")'
-    - strace julia -e 'cd(Pkg.dir("BinDeps", "test")); include("runtests.jl"); println("Woot!")' 2>&1 | tail -n 2000
