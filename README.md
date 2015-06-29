@@ -1,6 +1,8 @@
 BinDeps.jl
 ==========
 
+[![Build Status](https://travis-ci.org/JuliaLang/BinDeps.jl.svg?branch=master)](https://travis-ci.org/JuliaLang/BinDeps.jl)
+
 Easily build binary dependencies for Julia packages 
 
 # FAQ

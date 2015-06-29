@@ -1,0 +1,8 @@
+language: julia
+os:
+  - linux
+julia:
+  - release
+  - nightly
+notifications:
+  email: false
