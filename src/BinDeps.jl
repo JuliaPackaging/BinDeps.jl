@@ -338,7 +338,7 @@ module BinDeps
         target = !isempty(s.target) ? s.target : basename(base_filename)
         @dependent_steps begin
             CreateDirectory(dirname(s.dest),true)
-            DirectoryRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
+            FileRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
         end
     end
 
