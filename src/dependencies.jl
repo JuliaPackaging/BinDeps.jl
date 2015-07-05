@@ -752,7 +752,7 @@ end
 
 execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
 
-macro install (_libmaps...)
+macro install(_libmaps...)
     if length(_libmaps) == 0
         return esc(quote
             if bindeps_context.do_install
