@@ -140,7 +140,8 @@ module BinDeps
     type FileUnpacker <: BuildStep
         src::String     #file
         dest::String    #directory
-        target::String  #file inside the archive to test for existence (or blank to check for a.tgz => a/)
+        target::String  #file or directory inside the archive to test
+                        #for existence (or blank to check for a.tgz => a/)
     end
 
 
@@ -220,6 +221,11 @@ module BinDeps
 
     type DirectoryRule <: BuildStep
         dir::String
+        step
+    end
+
+    type PathRule <: BuildStep
+        path::String
         step
     end
 
@@ -338,7 +344,7 @@ module BinDeps
         target = !isempty(s.target) ? s.target : basename(base_filename)
         @dependent_steps begin
             CreateDirectory(dirname(s.dest),true)
-            FileRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
+            PathRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
         end
     end
 
@@ -443,6 +449,18 @@ module BinDeps
     		info("Directory $(s.dir) already created")
         end
     end
+
+    function run(s::PathRule)
+        if !ispath(s.path)
+            run(s.step)
+            if !ispath(s.path)
+                error("Path $(s.path) was not created successfully (Tried to run $(s.step) )")
+            end
+        else
+            info("Path $(s.path) already created")
+        end
+    end
+
     function run(s::BuildStep)
         error("Unimplemented BuildStep: $(typeof(s))")
     end
