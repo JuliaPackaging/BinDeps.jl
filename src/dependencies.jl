@@ -433,9 +433,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     steps
 end
 
-@osx_only const EXTENSIONS = ["",".dylib"]
-@windows_only const EXTENSIONS = ["", ".dll"]
-@linux_only const EXTENSIONS = ["",".so"]
+const EXTENSIONS = ["", "." * Libdl.dlext]
 
 #
 # Finds all copies of the library on the system, listed in preference order.
