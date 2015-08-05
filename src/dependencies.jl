@@ -113,7 +113,7 @@ function available_versions(p::AptGet)
     vers = ASCIIString[]
     lookfor_version = false
     for l in eachline(`apt-cache showpkg $(p.package)`)
-        if beginswith(l,"Version:")
+        if startswith(l,"Version:")
             try
                 vs = l[(1+length("Version: ")):end]
                 push!(vers, vs)
@@ -121,9 +121,9 @@ function available_versions(p::AptGet)
         elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) != nothing
             m.captures[2] != nothing ? push!(vers, m.captures[2]) :
                                        push!(vers, m.captures[4])
-        elseif beginswith(l, "Versions:")
+        elseif startswith(l, "Versions:")
             lookfor_version = true
-        elseif beginswith(l, "Reverse Depends:")
+        elseif startswith(l, "Reverse Depends:")
             lookfor_version = false
         end
     end
@@ -157,7 +157,7 @@ function available_version(y::Yum)
             found_uname = endswith(l, uname)
             continue
         end
-        if beginswith(l, "Version")
+        if startswith(l, "Version")
             return convert(VersionNumber, split(l)[end])
         end
     end
@@ -177,7 +177,7 @@ package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.packag
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
     for l in eachline(`/usr/bin/pacman -Si $(p.package)`) # To circumvent alias problems
-        if beginswith(l, "Version")
+        if startswith(l, "Version")
             # The following isn't perfect, but it's hopefully less brittle than
             # writing a regex for pacman's nonexistent version-string standard.
 
