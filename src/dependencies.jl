@@ -548,7 +548,7 @@ end
 if OS_NAME == :Darwin
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
 elseif OS_NAME == :Linux
-    defaults = [Binaries, PackageManager,SystemPaths,BuildProcess]
+    defaults = [PackageManager,SystemPaths,BuildProcess, Binaries]
 elseif OS_NAME == :Windows
     defaults = [Binaries,PackageManager,SystemPaths]
 else
