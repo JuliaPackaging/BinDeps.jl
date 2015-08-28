@@ -356,3 +356,29 @@ which will assign the result to the `_foo` and `_bar` variables instead.
 
   	Get the declared sources from the dependency dep and put them in the default 
   	download location
+
+# Diagnostics
+
+A simple way to see what libraries are required by a package, and to detect missing dependencies,
+is to use `BinDeps.debug("PackageName")`:
+
+```
+julia> using BinDeps
+
+julia> BinDeps.debug("Cairo")
+INFO: Reading build script...
+The package declares 1 dependencies.
+ - Library Group "cairo" (satisfied by BinDeps.SystemPaths, BinDeps.SystemPaths)
+     - Library "png" (not applicable to this system)
+     - Library "pixman" (not applicable to this system)
+     - Library "ffi" (not applicable to this system)
+     - Library "gettext"
+        - Satisfied by:
+          - System Paths at /usr/lib64/preloadable_libintl.so
+          - System Paths at /usr/lib64/libgettextpo.so
+        - Providers:
+          - BinDeps.AptGet package gettext (can't provide)
+          - BinDeps.Yum package gettext-libs (can't provide)
+          - Autotools Build
+...
+```
