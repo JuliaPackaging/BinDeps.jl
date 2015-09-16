@@ -322,7 +322,7 @@ module BinDeps
         end
         collection.cwd = s.dir
     end
-    lower(s::Nothing,collection) = nothing
+    @compat lower(s::Void,collection) = nothing
     lower(s::Function,collection) = push!(collection,s)
     lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(mkpath(s.dest))), )
     lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )

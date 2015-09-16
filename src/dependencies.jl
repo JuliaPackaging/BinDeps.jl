@@ -498,7 +498,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             check_path!(ret,dep,opath)
         end
         @linux_only begin
-            soname = ccall(:jl_lookup_soname, Ptr{Uint8}, (Ptr{Uint8}, Csize_t), lib, sizeof(lib))
+            soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
             soname != C_NULL && check_path!(ret,dep,bytestring(soname))
         end
     end
@@ -508,7 +508,7 @@ end
 function check_path!(ret,dep,opath)
     flags = Libdl.RTLD_LAZY
     handle = Libc.malloc(2*sizeof(Ptr{Void}))
-    err = ccall(:jl_uv_dlopen,Cint,(Ptr{Uint8},Ptr{Void},Cuint),opath,handle,flags)
+    err = ccall(:jl_uv_dlopen,Cint,(Ptr{UInt8},Ptr{Void},Cuint),opath,handle,flags)
     if err == 0
         check_system_handle!(ret,dep,handle)
         Libdl.dlclose(handle)
