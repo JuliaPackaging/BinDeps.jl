@@ -8,13 +8,13 @@ abstract DependencyHelper
 
 type PackageContext
     do_install::Bool
-    dir::String
-    package::String
+    dir::AbstractString
+    package::AbstractString
     deps::Vector{Any}
 end
 
 type LibraryDependency
-    name::String
+    name::AbstractString
     context::PackageContext
     providers::Vector{@compat Tuple{DependencyProvider,Dict{Symbol,Any}}}
     helpers::Vector{@compat Tuple{DependencyHelper,Dict{Symbol,Any}}}
@@ -23,7 +23,7 @@ type LibraryDependency
 end
 
 type LibraryGroup
-    name::String
+    name::AbstractString
     deps::Vector{LibraryDependency}
 end
 
@@ -105,7 +105,7 @@ DEBIAN_VERSION_REGEX = r"^
 
 const has_apt = try success(`apt-get -v`) catch e false end
 type AptGet <: PackageManager
-    package::String
+    package::AbstractString
 end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
@@ -141,7 +141,7 @@ libdir(p::AptGet,dep) = ["/usr/lib", "/usr/lib64", "/usr/lib32", "/usr/lib/x86_6
 
 const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
-    package::String
+    package::AbstractString
 end
 can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
@@ -170,7 +170,7 @@ pkg_name(y::Yum) = y.package
 # Note that `pacman --version` has an unreliable return value.
 const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
-    package::String
+    package::AbstractString
 end
 can_use(::Type{Pacman}) = has_pacman && OS_NAME == :Linux
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
@@ -231,7 +231,7 @@ type RemoteBinaries <: Binaries
 end
 
 type CustomPathBinaries <: Binaries
-    path::String
+    path::AbstractString
 end
 
 libdir(p::CustomPathBinaries,dep) = p.path
@@ -257,10 +257,10 @@ Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}([k => v for (k,v) in opts
 
 export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
-provider{T<:PackageManager}(::Type{T},package::String; opts...) = T(package)
+provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
 provider(::Type{Binaries},uri::URI; opts...) = RemoteBinaries(uri)
-provider(::Type{Binaries},path::String; opts...) = CustomPathBinaries(path)
+provider(::Type{Binaries},path::AbstractString; opts...) = CustomPathBinaries(path)
 provider(::Type{SimpleBuild},steps; opts...) = SimpleBuild(steps)
 provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; opts...)
 provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection); opts...) = provider(SimpleBuild,steps; opts...)
@@ -400,16 +400,16 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:libtarget] = ByteString[x*"."*dlext for x in dep.properties[:aliases]]
     end
     if !haskey(opts,:include_dirs)
-        opts[:include_dirs] = String[]
+        opts[:include_dirs] = AbstractString[]
     end
     if !haskey(opts,:lib_dirs)
-        opts[:lib_dirs] = String[]
+        opts[:lib_dirs] = AbstractString[]
     end
     if !haskey(opts,:pkg_config_dirs)
-        opts[:pkg_config_dirs] = String[]
+        opts[:pkg_config_dirs] = AbstractString[]
     end
     if !haskey(opts,:rpath_dirs)
-        opts[:rpath_dirs] = String[]
+        opts[:rpath_dirs] = AbstractString[]
     end
     if haskey(opts,:configure_subdir)
         opts[:srcdir] = joinpath(opts[:srcdir],opts[:configure_subdir])
@@ -447,7 +447,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]);dep.providers])
     for (p,opts) in providers
         (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
-        paths = String[]
+        paths = AbstractString[]
 
         # Allow user to override installation path
         if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
@@ -766,8 +766,8 @@ macro install(_libmaps...)
         push!(ret.args,
             esc(quote
                     load_cache = Dict()
-                    pre_hooks = Set{String}()
-                    load_hooks = Set{String}()
+                    pre_hooks = Set{AbstractString}()
+                    load_hooks = Set{AbstractString}()
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
@@ -839,11 +839,11 @@ end
 # the name of the global variable to be set to the result of the lookup.
 # The second argument may be as follows:
 #
-#  1. Vector{Symbol} or Vector{T <: String}
+#  1. Vector{Symbol} or Vector{T <: AbstractString}
 #       Only load that are declared whose name is listed in the Array
 #       E.g. @load_dependencies "file.jl" [:cairo, :tk]
 #
-#  2. Associative{S<:Union(Symbol,String),S<:Union(Symbol,String)}
+#  2. Associative{S<:Union(Symbol,AbstractString),S<:Union(Symbol,AbstractString)}
 #       Only loads libraries whose name matches a key in the Associative collection, but assigns it
 #       to the name matiching the corresponsing value
 #       E.g. @load_dependencies "file.jl" [:cairo=>:libcairo, :tk=>:libtk]
@@ -862,7 +862,7 @@ macro load_dependencies(args...)
     if length(args) == 1
         if isa(args[1],Expr)
             arg1 = eval(args[1])
-        elseif typeof(args[1]) <: String
+        elseif typeof(args[1]) <: AbstractString
             file = args[1]
             dir = dirname(normpath(joinpath(dirname(file),"..")))
         elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
@@ -897,7 +897,7 @@ macro load_dependencies(args...)
         end
         name = sym = dep.name
         if arg1 !== nothing
-            if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: String),eltype(arg1)))
+            if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: AbstractString),eltype(arg1)))
                 found = false
                 for need in keys(arg1)
                     found = (dep.name == string(need))
@@ -910,7 +910,7 @@ macro load_dependencies(args...)
                 if !found
                     continue
                 end
-            elseif isa(arg1,Vector) && ((eltype(arg1) == Symbol) || (eltype(arg1) <: String))
+            elseif isa(arg1,Vector) && ((eltype(arg1) == Symbol) || (eltype(arg1) <: AbstractString))
                 found = false
                 for i = 1:length(args)
                     found = (dep.name == string(arg1[i]))
@@ -953,7 +953,7 @@ macro load_dependencies(args...)
     ret
 end
 
-function build(pkg::String, method; dep::String="", force=false)
+function build(pkg::AbstractString, method; dep::AbstractString="", force=false)
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
     context = BinDeps.PackageContext(false,dir,pkg,Any[])
