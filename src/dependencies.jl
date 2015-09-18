@@ -263,7 +263,7 @@ provider(::Type{Binaries},uri::URI; opts...) = RemoteBinaries(uri)
 provider(::Type{Binaries},path::AbstractString; opts...) = CustomPathBinaries(path)
 provider(::Type{SimpleBuild},steps; opts...) = SimpleBuild(steps)
 provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; opts...)
-provider(::Type{BuildProcess},steps::Union(BuildStep,SynchronousStepCollection); opts...) = provider(SimpleBuild,steps; opts...)
+@compat provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
@@ -843,7 +843,7 @@ end
 #       Only load that are declared whose name is listed in the Array
 #       E.g. @load_dependencies "file.jl" [:cairo, :tk]
 #
-#  2. Associative{S<:Union(Symbol,AbstractString),S<:Union(Symbol,AbstractString)}
+#  2. Associative{S<:Union{Symbol,AbstractString},S<:Union{Symbol,AbstractString}}
 #       Only loads libraries whose name matches a key in the Associative collection, but assigns it
 #       to the name matiching the corresponsing value
 #       E.g. @load_dependencies "file.jl" [:cairo=>:libcairo, :tk=>:libtk]
