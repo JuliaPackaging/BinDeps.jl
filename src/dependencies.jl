@@ -766,8 +766,8 @@ macro install(_libmaps...)
         push!(ret.args,
             esc(quote
                     load_cache = Dict()
-                    pre_hooks = Set{AbstractString}()
-                    load_hooks = Set{AbstractString}()
+                    pre_hooks = Set{$AbstractString}()
+                    load_hooks = Set{$AbstractString}()
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
