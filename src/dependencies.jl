@@ -320,7 +320,7 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
     end
 end
 function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
-    localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
+    localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     @build_steps begin
         FileDownloader(string(h.uri),localfile)
         ChecksumValidator(get(opts,:SHA,""),localfile)
@@ -330,7 +330,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
 end
 function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
-    localfile = joinpath(downloadsdir(dep),basename(h.uri.path))
+    localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     steps = @build_steps begin
         FileDownloader(string(h.uri),localfile)
         ChecksumValidator(get(opts,:SHA,""),localfile)
