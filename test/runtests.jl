@@ -2,6 +2,7 @@
 
 using Base.Test
 using Compat
+using BinDeps
 
 Pkg.add("Cairo")  # Tests apt-get code paths
 using Cairo
