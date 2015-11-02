@@ -522,7 +522,7 @@ if VERSION < v"0.5.0-dev+1022"
 else
     function check_path!(ret, dep, opath)
         flags = Libdl.RTLD_LAZY
-        handle = ccall(:jl_dlopen, Ptr{Void}, (Ptr{UInt8}, Cuint), opath, flags)
+        handle = ccall(:jl_dlopen, Ptr{Void}, (Cstring, Cuint), opath, flags)
         try
             check_system_handle!(ret, dep, handle)
         finally
