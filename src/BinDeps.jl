@@ -46,10 +46,15 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for checkcmd in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+            for download_engine in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+                if download_engine == :powershell
+                    checkcmd = `$download_engine -help`
+                else
+                    checkcmd = `$download_engine --help`
+                end
                 try
-                    if success(`$checkcmd --help`)
-                        downloadcmd = checkcmd
+                    if success(checkcmd)
+                        downloadcmd = download_engine
                         break
                     end
                 catch
