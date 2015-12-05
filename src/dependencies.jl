@@ -199,6 +199,30 @@ pkg_name(p::Pacman) = p.package
 
 libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
+# zypper is a package manager used by openSUSE
+const has_zypper = try success(`zypper --version`) catch e false end
+type Zypper <: PackageManager
+    package::AbstractString
+end
+can_use(::Type{Zypper}) = has_zypper && OS_NAME == :Linux
+package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
+function available_version(z::Zypper)
+    uname = readchomp(`uname -m`)
+    found_uname = false
+    found_version = false
+    for l in eachline(`zypper info $(z.package)`)
+        l = chomp(l)
+        if startswith(l, "Vers")
+            versionstr = strip(split(l, ":")[end])
+            return convert(VersionNumber, versionstr)
+        end
+    end
+    error("zypper did not return version information.  This shouldn't happen. Please file a bug!")
+end
+pkg_name(z::Zypper) = z.package
+
+libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
+
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
@@ -255,7 +279,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}([k => v for (k,v) in opts]))
 
-export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Pacman, Zypper, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -316,6 +340,17 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
         `sudo pacman -S --needed $(h.package)`
+        ()->(ccall(:jl_read_sonames,Void,()))
+    end
+end
+function generate_steps(dep::LibraryDependency,h::Zypper,opts)
+    if get(opts,:force_rebuild,false)
+        error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
+              "Please make any necessary adjustments manually (This might just be a version upgrade)")
+    end
+    @build_steps begin
+        println("Installing dependency $(h.package) via `sudo zypper install $(h.package)`:")
+        `sudo zypper install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
