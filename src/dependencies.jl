@@ -199,12 +199,7 @@ pkg_name(p::Pacman) = p.package
 
 libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
-
-#######
-
-# experimental zypper using yum and pacman as template
 # zypper is a package manager used by openSUSE
-
 const has_zypper = try success(`zypper --version`) catch e false end
 type Zypper <: PackageManager
     package::AbstractString
@@ -213,11 +208,11 @@ can_use(::Type{Zypper}) = has_zypper && OS_NAME == :Linux
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
-    found_uname = false
-    found_version = false
-    for l in eachline(`zypper info $(z.package)`)
+    ENV2 = copy(ENV)
+    ENV2["LC_ALL"] = "C"
+    for l in eachline(setenv(`zypper info $(z.package)`, ENV2))
         l = chomp(l)
-        if startswith(l, "Version")
+        if startswith(l, "Version:")
             versionstr = strip(split(l, ":")[end])
             return convert(VersionNumber, versionstr)
         end
@@ -227,8 +222,6 @@ end
 pkg_name(z::Zypper) = z.package
 
 libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
-
-########
 
 # Can use everything else without restriction by default
 can_use(::Type) = true
@@ -286,7 +279,6 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}([k => v for (k,v) in opts]))
 
-# original # export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 export AptGet, Yum, Pacman, Zypper, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
@@ -350,11 +342,6 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         `sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
-    
-######
-
-# new for Zypper / openSUSE
-
 function generate_steps(dep::LibraryDependency,h::Zypper,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
@@ -365,9 +352,6 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
         `sudo zypper install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
-end
-
-#######
 end
 function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
