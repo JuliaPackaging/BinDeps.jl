@@ -342,6 +342,7 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         `sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
+end
 function generate_steps(dep::LibraryDependency,h::Zypper,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
