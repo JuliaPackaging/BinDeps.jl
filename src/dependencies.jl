@@ -199,6 +199,36 @@ pkg_name(p::Pacman) = p.package
 
 libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
+
+# The nix pacakge manager is available on most UNIX platforms 
+
+const has_nix = try success(`nix-env --version`) catch e false end
+type Nix <: PackageManager 
+    package::String
+end
+can_use(::Type{Nix}) = has_nix && OS_NAME == :Linux
+package_available(p::Nix) = can_use(Nix) && !isempty(available_versions(p))
+function available_versions(p::Nix)
+    vers = ASCIIString[]
+    for l in eachline(`nix-env -qa` |> `grep $(p.package)`)
+		parts = split(l, "-")  
+        if length(parts)>1
+			push!(vers, parts[2])
+		end
+    end
+    return vers
+end
+function available_version(p::Nix)
+    vers = available_versions(p)
+    isempty(vers) && error("nix-env did not return version information. This shouldn't happen. Please file a bug!")
+    length(vers) > 1 && warn("Multiple versions of $(p.package) are available.  Use BinDeps.available_versions to get all versions.")
+    return vers[1]  # to be consistent with nix-env behaviour we install the first encountered version
+end
+pkg_name(a::Nix) = a.package
+
+libdir(p::Nix,dep) = ["$(homedir())/.nix-profile/lib", "$(homedir())/.nix-profil/lib64"]
+ 
+
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
@@ -255,7 +285,7 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}([k => v for (k,v) in opts]))
 
-export AptGet, Yum, Pacman, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Pacman, Nix, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -316,6 +346,17 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
         `sudo pacman -S --needed $(h.package)`
+        ()->(ccall(:jl_read_sonames,Void,()))
+    end
+end
+function generate_steps(dep::LibraryDependency,h::Nix,opts)  
+    if get(opts,:force_rebuild,false)
+        error("Will not force nix to rebuild dependency \"$(dep.name)\".\n"*
+              "Please make any necessary adjustments manually (This might just be a version upgrade)")
+    end
+    @build_steps begin
+        println("Installing dependency $(h.package) via `nix-env -i $(h.package)`:")
+        `nix-env -i $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end

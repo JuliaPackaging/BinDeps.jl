@@ -150,7 +150,7 @@ defined the following dependencies:
 ```
 
 Let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
-in apt-get and that both libraries are installed by the `libbaz` yum package and the `baz` pacman package. We may
+in apt-get and that both libraries are installed by the `libbaz` yum package and the `baz` pacman or nix package. We may
 declare this as follows:
 
 ```julia
@@ -160,6 +160,7 @@ declare this as follows:
 	})
 	provides(Yum,"libbaz",[foo,baz])
 	provides(Pacman,"baz",[foo,baz])
+	provides(Nix, "baz",[foo,baz])
 ```
 
 One may remember the `provides` function by thinking `AptGet` `provides` the dependencies `foo` and `baz`. 
@@ -182,7 +183,7 @@ which is equivalent to (and in fact will be internally dispatched) to:
 ```
 
 If one provide satisfied multiple dependencies simultaneously, `dependency` may 
-also be an array of dependencies (as in the `Yum` and `Pacman` cases above). 
+also be an array of dependencies (as in the `Yum`, `Pacman` and `Nix` cases above). 
 
 There are also several builtin options. Some of them are:
 
