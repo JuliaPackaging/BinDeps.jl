@@ -209,7 +209,6 @@ package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
     found_uname = false
-    found_version = false
     ENV2 = copy(ENV)
     ENV2["LC_ALL"] = "C"
     for l in eachline(setenv(`zypper info $(z.package)`, ENV2))
