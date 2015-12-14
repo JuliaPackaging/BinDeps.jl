@@ -208,10 +208,16 @@ can_use(::Type{Zypper}) = has_zypper && OS_NAME == :Linux
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
+    found_uname = false
+    found_version = false
     ENV2 = copy(ENV)
     ENV2["LC_ALL"] = "C"
     for l in eachline(setenv(`zypper info $(z.package)`, ENV2))
         l = chomp(l)
+        if !found_uname
+            found_uname = endswith(l, uname)
+            continue
+        end
         if startswith(l, "Version:")
             versionstr = strip(split(l, ":")[end])
             return convert(VersionNumber, versionstr)
