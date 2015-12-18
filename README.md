@@ -150,7 +150,7 @@ defined the following dependencies:
 ```
 
 Let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
-in apt-get and that both libraries are installed by the `libbaz` yum package and the `baz` pacman package. We may
+in apt-get and that both libraries are installed by the `baz` or the `baz1` yum package, and the `baz` pacman package. We may
 declare this as follows:
 
 ```julia
@@ -158,7 +158,7 @@ declare this as follows:
 		"libfoo-dev" => foo,
 		"libbaz-dev" => baz,
 	})
-	provides(Yum,"libbaz",[foo,baz])
+	provides(Yum,["baz","baz1"],[foo,baz])
 	provides(Pacman,"baz",[foo,baz])
 ```
 

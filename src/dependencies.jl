@@ -298,6 +298,12 @@ provider(::Type{Autotools},a::Autotools; opts...) = a
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
+function provides{T}(::Type{T},packages::AbstractArray,dep::LibraryDependency; opts...)
+    for p in packages
+        provides(T,p,dep; opts...)
+    end
+end
+
 function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...)
     p = provider(T,ps; opts...)
     for dep in deps
