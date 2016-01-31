@@ -413,6 +413,10 @@ function gethelper(dep::LibraryDependency,method)
     return (nothing,nothing)
 end
 
+# convert aliases="foo" into aliases=["foo"] to avoid iterating over characters 'f' 'o' 'o'
+stringarray(s::AbstractString) = [s]
+stringarray(s) = s
+
 function generate_steps(dep::LibraryDependency,method)
     (p,opts) = getoneprovider(dep,method)
     !is(p,nothing) && return generate_steps(p,dep,opts)
@@ -440,10 +444,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:installed_libpath] = ByteString[joinpath(libdir(dep),opts[:installed_libname])]
         delete!(opts, :installed_libname)
     elseif !haskey(opts,:installed_libpath)
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in get(dep.properties,:aliases,ByteString[])]
+        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,ByteString[]))]
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
-        opts[:libtarget] = ByteString[x*"."*dlext for x in dep.properties[:aliases]]
+        opts[:libtarget] = ByteString[x*"."*dlext for x in stringarray(dep.properties[:aliases])]
     end
     if !haskey(opts,:include_dirs)
         opts[:include_dirs] = AbstractString[]
