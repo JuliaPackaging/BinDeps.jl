@@ -1,5 +1,7 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 
+import Base: show
+
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract DependencyProvider
 
@@ -25,12 +27,6 @@ end
 type LibraryGroup
     name::AbstractString
     deps::Vector{LibraryDependency}
-end
-
-import Base: show
-
-function show(io::IO, dep::LibraryDependency)
-    print(io,"LibraryDependency(",dep.name,")")
 end
 
 # Default directory organization
