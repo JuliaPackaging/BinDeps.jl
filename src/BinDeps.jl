@@ -49,9 +49,9 @@ module BinDeps
         if downloadcmd === nothing
             for download_engine in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
                 if download_engine == :powershell
-                    checkcmd = `$download_engine -help`
-                else
-                    checkcmd = `$download_engine --help`
+                    checkcmd = `cmd $download_engine new-variable foo`
+                 else
+                    checkcmd = `cmd $download_engine --help`
                 end
                 try
                     if success(checkcmd)
@@ -70,7 +70,7 @@ module BinDeps
         elseif downloadcmd == :fetch
             return `fetch -f $filename $url`
         elseif downloadcmd == :powershell
-            return `powershell -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
+            return `cmd powershell -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
         else
             error("No download agent available; install curl, wget, or fetch.")
         end
