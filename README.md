@@ -75,9 +75,11 @@ the actual package, I want to answer a few common questions:
 
 # The high level interface - Declaring dependencies
 
-To get a feel for the high level interface provided by BinDeps, have a look at a 
-real-world example, namely the [build script from the Cairo package](https://github.com/JuliaLang/Cairo.jl/blob/kf/bindeps2/deps/build.jl).
-That build script uses almost all the features that BinDeps currently provides and is a great overview, but let's take
+To get a feel for the high level interface provided by BinDeps, have a look at 
+real-world examples. The [build script from the GSL pakage](https://github.com/jiahao/GSL.jl/blob/master/deps/build.jl)
+illustrates the simple case where only one library is needed. On the other hand, the
+[build script from the Cairo package](https://github.com/JuliaLang/Cairo.jl/blob/master/deps/build.jl)
+uses almost all the features that BinDeps currently provides and offers a complete overview. Let's take
 it apart, to see exactly what's going on.
 
 As you can see Cairo depends on a lot of libraries that all need to be managed by this build script. 
