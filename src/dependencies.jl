@@ -2,6 +2,8 @@
 
 import Base: show
 
+abstract Dependency
+
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract DependencyProvider
 
@@ -15,19 +17,30 @@ type PackageContext
     deps::Vector{Any}
 end
 
-type LibraryDependency
+type LibraryDependency <: Dependency
     name::AbstractString
     context::PackageContext
     providers::Vector{@compat Tuple{DependencyProvider,Dict{Symbol,Any}}}
     helpers::Vector{@compat Tuple{DependencyHelper,Dict{Symbol,Any}}}
     properties::Dict{Symbol,Any}
-    libvalidate::Function
+    depvalidate::Function
 end
 
-type LibraryGroup
+type ExecutableDependency <: Dependency
     name::AbstractString
-    deps::Vector{LibraryDependency}
+    context::PackageContext
+    providers::Vector{@compat Tuple{DependencyProvider,Dict{Symbol,Any}}}
+    helpers::Vector{@compat Tuple{DependencyHelper,Dict{Symbol,Any}}}
+    properties::Dict{Symbol,Any}
+    depvalidate::Function
 end
+
+type DependencyGroup
+    name::AbstractString
+    deps::Vector{Dependency}
+end
+
+typealias LibraryGroup DependencyGroup
 
 # Default directory organization
 pkgdir(dep) = dep.context.dir
@@ -42,9 +55,31 @@ srcdir(dep) = joinpath(depsdir(dep),"src")
 libdir(provider, dep) = [libdir(dep), libdir(dep)*"32", libdir(dep)*"64"]
 bindir(provider, dep) = bindir(dep)
 
-successful_validate(l,p) = true
+successful_validate(l, p=nothing) = true
 
-function _library_dependency(context::PackageContext, name; properties...)
+function BinDeps.isexecutable(filepath)
+    if isfile(filepath)
+        res = false
+        @unix_only begin
+            res = ccall(:access, Cint, (Ptr{Uint8}, Cint), filepath, 1) == 0
+        end
+        # unfortunately there is no easy way to tell if this process can execute a file on Windows
+        @windows_only begin
+            res = true
+        end
+        if res
+            return true
+        else
+            warn("File $filepath exists but is not executable by the current process.")
+            return false
+        end
+    else
+        return false
+    end
+end
+
+# constructor for ExecutableDependency and LibraryDependency
+@compat function (::Type{T}){T<:Dependency}(context::PackageContext, name; properties...)
     validate = successful_validate
     group = nothing
     for i in 1:length(properties)
@@ -57,7 +92,14 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
+    r = T(
+        name,
+        context,
+        Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),
+        Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),
+        (Symbol=>Any)[name => value for (name,value) in properties],
+        validate
+    )
     if group !== nothing
         push!(group.deps,r)
     else
@@ -66,8 +108,8 @@ function _library_dependency(context::PackageContext, name; properties...)
     r
 end
 
-function _library_group(context,name)
-    r = LibraryGroup(name,LibraryDependency[])
+function DependencyGroup(context, name::AbstractString)
+    r = DependencyGroup(name, Dependency[])
     push!(context.deps,r)
     r
 end
@@ -82,14 +124,32 @@ macro setup()
         else
             bindeps_context = BinDeps.PackageContext(true,$dir,$package,Any[])
         end
-        library_group(args...) = BinDeps._library_group(bindeps_context,args...)
-        library_dependency(args...; properties...) = BinDeps._library_dependency(bindeps_context,args...;properties...)
+        @deprecate library_group(args...) dependency_group(args...)
+        dependency_group(args...) = BinDeps.DependencyGroup(bindeps_context,args...)
+        library_dependency(args...; properties...) = BinDeps.LibraryDependency(
+            bindeps_context,
+            args...;
+            properties...
+        )
+        executable_dependency(args...; properties...) = BinDeps.ExecutableDependency(
+            bindeps_context,
+            args...;
+            properties...
+        )
     end)
 end
 
-export library_dependency, bindir, srcdir, usrdir, libdir
+export library_dependency, executable_dependency, bindir, srcdir, usrdir, libdir
 
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@BinDeps.setup`?")
+executable_dependency(args...; properties...) = error("No context provided. Did you forget `@BinDeps.setup`?")
+
+# binary finders
+const has_which = try success(`which which`) catch e false end
+const has_where = try success(`where where`) catch e false end
+
+# normal contents of %PATHEXT% on Windows
+const win_pathext = (".COM", ".EXE", ".BAT", ".CMD", ".VBS", ".VBE", ".JS", ".JSE", ".WSF", ".WSH", ".MSC")
 
 abstract PackageManager <: DependencyProvider
 
@@ -246,8 +306,8 @@ type NetworkSource <: Sources
     uri::URI
 end
 
-srcdir(s::Sources, dep::LibraryDependency) = srcdir(dep,s,Dict{Symbol,Any}())
-function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
+srcdir(s::Sources, dep::Dependency) = srcdir(dep, s, Dict{Symbol,Any}())
+function srcdir(dep::Dependency, s::NetworkSource, opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
@@ -273,7 +333,7 @@ type Autotools <: BuildProcess
 end
 
 type GetSources <: BuildStep
-    dep::LibraryDependency
+    dep::Dependency
 end
 
 lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelper(x.dep,Sources)...))
@@ -291,16 +351,16 @@ provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; op
 @compat provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
-provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
-provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
-function provides{T}(::Type{T},packages::AbstractArray,dep::LibraryDependency; opts...)
+provides(provider::DependencyProvider, dep::Dependency; opts...) = push!(dep.providers, (provider, (Symbol => Any)[k => v for (k, v) in opts]))
+provides(helper::DependencyHelper, dep::Dependency; opts...) = push!(dep.helpers, (helper, (Symbol => Any)[k => v for (k, v) in opts]))
+provides{T}(::Type{T}, p, dep::Dependency; opts...) = provides(provider(T, p; opts...), dep; opts...)
+function provides{T}(::Type{T}, packages::AbstractArray, dep::Dependency; opts...)
     for p in packages
         provides(T,p,dep; opts...)
     end
 end
 
-function provides{T}(::Type{T},ps,deps::Vector{LibraryDependency}; opts...)
+function provides{T, S<:Dependency}(::Type{T},ps,deps::Vector{S}; opts...)
     p = provider(T,ps; opts...)
     for dep in deps
         provides(p,dep; opts...)
@@ -314,9 +374,9 @@ function provides{T}(::Type{T},providers::Dict; opts...)
 end
 
 
-generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
-generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
-function generate_steps(dep::LibraryDependency,h::AptGet,opts)
+generate_steps(h::DependencyProvider, dep::Dependency) = error("Must also pass provider options")
+generate_steps(h::BuildProcess, dep::Dependency,opts) = h.steps
+function generate_steps(dep::Dependency,h::AptGet,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
@@ -324,10 +384,10 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo apt-get install $(h.package)`:")
         `sudo apt-get install $(h.package)`
-        ()->(ccall(:jl_read_sonames,Void,()))
+        $(isa(dep, LibraryDependency) && ()->(ccall(:jl_read_sonames, Void, ())))
     end
 end
-function generate_steps(dep::LibraryDependency,h::Yum,opts)
+function generate_steps(dep::Dependency,h::Yum,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
@@ -336,10 +396,10 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo yum install $(h.package)`:")
         `sudo yum install $(h.package)`
-        ()->(ccall(:jl_read_sonames,Void,()))
+        $(isa(dep, LibraryDependency) && ()->(ccall(:jl_read_sonames, Void, ())))
     end
 end
-function generate_steps(dep::LibraryDependency,h::Pacman,opts)
+function generate_steps(dep::Dependency,h::Pacman,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
@@ -347,10 +407,10 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
         `sudo pacman -S --needed $(h.package)`
-        ()->(ccall(:jl_read_sonames,Void,()))
+        $(isa(dep, LibraryDependency) && ()->(ccall(:jl_read_sonames, Void, ())))
     end
 end
-function generate_steps(dep::LibraryDependency,h::Zypper,opts)
+function generate_steps(dep::Dependency,h::Zypper,opts)
     if get(opts,:force_rebuild,false)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
@@ -358,10 +418,10 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
     @build_steps begin
         println("Installing dependency $(h.package) via `sudo zypper install $(h.package)`:")
         `sudo zypper install $(h.package)`
-        ()->(ccall(:jl_read_sonames,Void,()))
+        $(isa(dep, LibraryDependency) && ()->(ccall(:jl_read_sonames, Void, ())))
     end
 end
-function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
+function generate_steps(dep::Dependency, h::NetworkSource, opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     @build_steps begin
         FileDownloader(string(h.uri),localfile)
@@ -370,7 +430,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
         FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
     end
 end
-function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
+function generate_steps(dep::Dependency, h::RemoteBinaries, opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     steps = @build_steps begin
@@ -379,9 +439,9 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
         FileUnpacker(localfile,depsdir(dep),get(opts,:unpacked_dir,"usr"))
     end
 end
-generate_steps(dep::LibraryDependency,h::SimpleBuild,opts) = h.steps
+generate_steps(dep::Dependency, h::SimpleBuild, opts) = h.steps
 
-function getoneprovider(dep::LibraryDependency,method)
+function getoneprovider(dep::Dependency, method)
     for (p,opts) = dep.providers
         if typeof(p) <: method && can_use(typeof(p))
             return (p,opts)
@@ -390,7 +450,7 @@ function getoneprovider(dep::LibraryDependency,method)
     return (nothing,nothing)
 end
 
-function getallproviders(dep::LibraryDependency,method)
+function getallproviders(dep::Dependency, method)
     ret = Any[]
     for (p,opts) = dep.providers
         if typeof(p) <: method && can_use(typeof(p))
@@ -400,7 +460,7 @@ function getallproviders(dep::LibraryDependency,method)
     ret
 end
 
-function gethelper(dep::LibraryDependency,method)
+function gethelper(dep::Dependency, method)
     for (p,opts) = dep.helpers
         if typeof(p) <: method
             return (p,opts)
@@ -413,7 +473,7 @@ end
 stringarray(s::AbstractString) = [s]
 stringarray(s) = s
 
-function generate_steps(dep::LibraryDependency,method)
+function generate_steps(dep::Dependency, method)
     (p,opts) = getoneprovider(dep,method)
     !is(p,nothing) && return generate_steps(p,dep,opts)
     (p,hopts) = gethelper(dep,method)
@@ -485,7 +545,7 @@ const EXTENSIONS = ["", "." * Libdl.dlext]
 # Finds all copies of the library on the system, listed in preference order.
 # Return value is an array of tuples of the provider and the path where it is found
 #
-function _find_library(dep::LibraryDependency; provider = Any)
+function _find_dependency(dep::LibraryDependency; provider = Any)
     ret = Any[]
     # Same as find_library, but with extra check defined by dep
     libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
@@ -514,7 +574,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             l = joinpath(path, lib)
             h = Libdl.dlopen_e(l, Libdl.RTLD_LAZY)
             if h != C_NULL
-                works = dep.libvalidate(l,h)
+                works = dep.depvalidate(l,h)
                 l = Libdl.dlpath(h)
                 Libdl.dlclose(h)
                 if works
@@ -549,6 +609,123 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
     end
     return ret
+end
+
+function _find_dependency(dep::ExecutableDependency; provider = Any)
+    ret = Any[]
+
+    execnames = [dep.name; get(dep.properties, :aliases, ASCIIString[])]
+    # Make sure we keep the defaults first, but also look in the other directories
+    providers = unique([reduce(vcat, [getallproviders(dep, p) for p in defaults]); dep.providers])
+    for (p, opts) in providers
+        (p != nothing && can_use(typeof(p)) && can_provide(p, opts, dep)) || continue
+        paths = AbstractString[]
+
+        # Allow user to override installation path
+        # TODO: Figure out the equivalent for executables
+        # if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
+        #     unshift!(paths,opts[:installed_libpath])
+        # end
+
+        ppaths = bindir(p, dep)
+        append!(paths, isa(ppaths,Array) ? ppaths : [ppaths])
+
+        if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
+            push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
+        end
+
+        (isempty(paths) || all(map(isempty, paths))) && continue
+        for execname in execnames, path in paths
+            execpath = joinpath(path, execname)
+            if BinDeps.isexecutable(execpath)
+                if dep.depvalidate(execpath)
+                    push!(ret, ((p, opts), execpath))
+                else
+                    # We tried to validate this providers' executable, but it didn't satisfy
+                    # the requirements, so tell it to force a rebuild since the requirements
+                    # have most likely changed
+                    opts[:force_rebuild] = true
+                end
+            end
+        end
+    end
+
+    # Now check system libraries
+    if has_which || has_where
+        for execname in execnames
+            execpaths = locate_exec(execname)
+            for execpath in execpaths
+                add_exec!(ret, dep, execpath)
+            end
+        end
+    else
+        Base.warn_once("Cannot locate installed executables without `which` or `where`.")
+    end
+
+    return ret
+end
+
+function suppress_stderr(f::Function)
+    stderr = STDERR
+    redirect_stderr()
+    res = nothing
+    try
+        res = f()
+    finally
+        redirect_stderr(stderr)
+    end
+
+    return res
+end
+
+function readlines_default(arg, default)
+    res = default
+
+    try
+        res = readlines(arg)
+    end
+
+    return res
+end
+
+@unix_only function locate_exec(execname)
+    empty = ByteString[]
+
+    if has_which
+        return map!(chomp, readlines_default(`which -a $execname`, empty))
+    else
+        return empty
+    end
+end
+
+@windows_only function locate_exec(execname)
+    empty = ByteString[]
+    paths = ByteString[]
+
+    if has_which
+        # prefer which as it handles executableness properly
+        append!(paths, map!(chomp, readlines_default(`which -a $execname`, empty)))
+    elseif has_where
+        # where will give non-executable files too
+        # we'll prefer .%PATHEXT% files
+        for ext in win_pathext
+            append!(paths, map!(chomp, suppress_stderr(()->readlines_default(`where $execname$ext`, empty))))
+        end
+    else
+        return empty
+    end
+end
+
+function add_exec!(ret, dep, execpath)
+    for (_, retexecpath) in ret
+        if execpath == retexecpath
+            return
+        end
+    end
+
+    if dep.depvalidate(execpath)
+        push!(ret, ((SystemPaths(), Dict()), execpath))
+    end
 end
 
 if VERSION < v"0.5.0-dev+1022"
@@ -595,7 +772,7 @@ function check_system_handle!(ret,dep,handle)
                 return
             end
         end
-        works = dep.libvalidate(libpath,handle)
+        works = dep.depvalidate(libpath,handle)
         if works
             push!(ret, ((SystemPaths(),Dict()), libpath))
         end
@@ -613,7 +790,7 @@ else
     defaults = [SystemPaths,BuildProcess]
 end
 
-function applicable(dep::LibraryDependency)
+function applicable(dep::Dependency)
     if haskey(dep.properties,:os)
         if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
             return false
@@ -624,7 +801,7 @@ function applicable(dep::LibraryDependency)
     return true
 end
 
-applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
+applicable(deps::DependencyGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
     if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
@@ -655,10 +832,10 @@ function can_provide(p::PackageManager,opts,dep)
     end
 end
 
-issatisfied(dep::LibraryDependency) = !isempty(_find_library(dep))
+issatisfied(dep::Dependency) = !isempty(_find_dependency(dep))
 
-allf(deps) = [dep => _find_library(dep) for dep in deps.deps]
-function satisfied_providers(deps::LibraryGroup, allfl = allf(deps))
+allf(deps) = [dep => _find_dependency(dep) for dep in deps.deps]
+function satisfied_providers(deps::DependencyGroup, allfl = allf(deps))
     viable_providers = nothing
     for dep in deps.deps
         if !applicable(dep)
@@ -674,7 +851,7 @@ function satisfied_providers(deps::LibraryGroup, allfl = allf(deps))
     viable_providers
 end
 
-function viable_providers(deps::LibraryGroup)
+function viable_providers(deps::DependencyGroup)
     vp = nothing
     for dep in deps.deps
         if !applicable(dep)
@@ -691,13 +868,13 @@ function viable_providers(deps::LibraryGroup)
 end
 
 #
-# We need to make sure all libraries are satisfied with the
+# We need to make sure all dependencies are satisfied with the
 # additional constraint that all of them are satisfied by the
 # same provider.
 #
-issatisfied(deps::LibraryGroup) = !isempty(satisfied_providers(deps))
+issatisfied(deps::DependencyGroup) = !isempty(satisfied_providers(deps))
 
-function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
+function _find_dependency(deps::DependencyGroup, allfl = allf(deps); provider = Any)
     providers = satisfied_providers(deps,allfl)
     p = nothing
     if isempty(providers)
@@ -724,7 +901,7 @@ function _find_library(deps::LibraryGroup, allfl = allf(deps); provider = Any)
     end for dep in filter(applicable,deps.deps)]
 end
 
-function satisfy!(deps::LibraryGroup, methods = defaults)
+function satisfy!(deps::DependencyGroup, methods = defaults)
     sp = satisfied_providers(deps)
     if !isempty(sp)
         for m in methods
@@ -772,8 +949,8 @@ function satisfy!(deps::LibraryGroup, methods = defaults)
         """)
 end
 
-function satisfy!(dep::LibraryDependency, methods = defaults)
-    sp = map(x->typeof(x[1][1]),_find_library(dep))
+function satisfy!(dep::Dependency, methods = defaults)
+    sp = map(x->typeof(x[1][1]),_find_dependency(dep))
     if !isempty(sp)
         for m in methods
             for s in sp
@@ -806,9 +983,10 @@ function satisfy!(dep::LibraryDependency, methods = defaults)
         """)
 end
 
-execute(dep::LibraryDependency,method) = run(lower(generate_steps(dep,method)))
+execute(dep::Dependency, method) = run(lower(generate_steps(dep, method)))
 
 macro install(_libmaps...)
+    ret = nothing
     if length(_libmaps) == 0
         return esc(quote
             if bindeps_context.do_install
@@ -829,13 +1007,13 @@ macro install(_libmaps...)
                     if bindeps_context.do_install
                         for d in bindeps_context.deps
                             p = BinDeps.satisfy!(d)
-                            libs = BinDeps._find_library(d; provider = p)
-                            if isa(d, BinDeps.LibraryGroup)
+                            libs = BinDeps._find_dependency(d; provider = p)
+                            if isa(d, BinDeps.DependencyGroup)
                                 if !isempty(libs)
                                     for dep in d.deps
                                         !BinDeps.applicable(dep) && continue
                                         if !haskey(load_cache, dep.name)
-                                            load_cache[dep.name] = libs[dep][2]
+                                            load_cache[dep.name] = (dep, libs[dep][2])
                                             opts = libs[dep][1][2]
                                             haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
                                             haskey(opts, :onload) && push!(load_hooks,opts[:onload])
@@ -845,7 +1023,7 @@ macro install(_libmaps...)
                             else
                                 for (k,v) in libs
                                     if !haskey(load_cache, d.name)
-                                        load_cache[d.name] = v
+                                        load_cache[d.name] = (d, v)
                                         opts = k[2]
                                         haskey(opts, :preload) && push!(pre_hooks,opts[:preload])
                                         haskey(opts, :onload) && push!(load_hooks,opts[:onload])
@@ -871,10 +1049,22 @@ macro install(_libmaps...)
                             end
                             """)
                         println(depsfile, "# Load dependencies")
+                        exec_deps = Dict()
                         for libkey in keys($libmaps)
-                            ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
-                            println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
+                            cached = get(load_cache, string(libkey), nothing)
+                            if cached !== nothing
+                                (dep, path) = cached
+                                if isa(dep, BinDeps.LibraryDependency)
+                                    println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(path), "\"")
+                                else
+                                    exec_deps[$libmaps[libkey]] = escape_string(path)
+                                end
+                            end
                         end
+                        if !isempty(exec_deps)
+                            println(depsfile, "_exec = ", repr(exec_deps))
+                        end
+
                         println(depsfile)
                         println(depsfile, "# Load-hooks")
                         println(depsfile, join(load_hooks,"\n"))
@@ -993,7 +1183,7 @@ macro load_dependencies(args...)
         errorcase = Expr(:block)
         push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.build() to install missing dependencies!")))
         push!(ret.args,quote
-            const $(esc(s)) = BinDeps._find_library($dep)
+            const $(esc(s)) = BinDeps._find_dependency($dep)
             if isempty($(esc(s)))
                 $errorcase
             end
