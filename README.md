@@ -139,6 +139,19 @@ There are a couple of other keyword arguments that are currently implemented:
 
 Other keyword arguments will most likely be added as necessary.
 
+## Executable Dependencies
+
+It is also possible to depend on the presence of executable files, either available on the
+system `PATH` (found using `which`, or `where` on Windows if `which` is not available) or 
+installed in `deps/usr/bin/`. E.g.:
+
+```julia
+python = executable_dependency("pip", aliases = ["pip2", "pip27"])
+```
+
+The above keyword arguments for `library_dependency` apply to this function with the 
+exception of `validate`, which accepts the path to the executable instead of the tuple.
+
 # The high level interface - Declaring build mechanisms
 
 Alright, now that we have declared all the dependencies that we
@@ -172,7 +185,7 @@ The basic signature of the provides function is
 ```
 
 where `data` is provider-specific (e.g. a string in all of the package manager 
-cases) and `dependency` is the return value from `library dependency. As you saw
+cases) and `dependency` is the return value from `library_dependency`. As you saw
 above multiple definitions may be combined into one function call as such:
 ```julia
 	provides(Provider,{data1=>dep1, data2=>dep2},options...)
@@ -190,13 +203,13 @@ There are also several builtin options. Some of them are:
 
  * `os = OS_NAME`
 
- 	This provider can only satisfy the library dependency on the specified `os`. 
+ 	This provider can only satisfy the dependency on the specified `os`. 
  	This argument takes has the same syntax as the `os` keyword argument to \
 	`library_dependency`.
 
- * `installed_libpath = "path"`
+ * `installed_path = "path"`
 
- 	If the provider installs a library dependency to someplace other than the
+ 	If the provider installs a dependency to someplace other than the
  	standard search paths, that location can be specified here.
 
  * `SHA = "sha"`
@@ -370,7 +383,7 @@ julia> using BinDeps
 julia> BinDeps.debug("Cairo")
 INFO: Reading build script...
 The package declares 1 dependencies.
- - Library Group "cairo" (satisfied by BinDeps.SystemPaths, BinDeps.SystemPaths)
+ - Dependency Group "cairo" (satisfied by BinDeps.SystemPaths, BinDeps.SystemPaths)
      - Library "png" (not applicable to this system)
      - Library "pixman" (not applicable to this system)
      - Library "ffi" (not applicable to this system)

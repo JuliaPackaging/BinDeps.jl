@@ -40,8 +40,6 @@ type DependencyGroup
     deps::Vector{Dependency}
 end
 
-typealias LibraryGroup DependencyGroup
-
 # Default directory organization
 pkgdir(dep) = dep.context.dir
 depsdir(dep) = joinpath(pkgdir(dep),"deps")
@@ -55,17 +53,34 @@ srcdir(dep) = joinpath(depsdir(dep),"src")
 libdir(provider, dep) = [libdir(dep), libdir(dep)*"32", libdir(dep)*"64"]
 bindir(provider, dep) = bindir(dep)
 
+destdir(dep::LibraryDependency) = libdir(dep)
+destdir(provider, dep::LibraryDependency) = libdir(provider, dep)
+destdir(dep::ExecutableDependency) = bindir(dep)
+destdir(provider, dep::ExecutableDependency) = bindir(provider, dep)
+
 successful_validate(l, p=nothing) = true
+
+# normal contents of %PATHEXT% on Windows
+const win_pathext = (".COM", ".EXE", ".BAT", ".CMD", ".VBS", ".VBE", ".JS", ".JSE", ".WSF", ".WSH", ".MSC")
+const win_case_pathext = [collect(win_pathext); map!(lowercase, collect(win_pathext))]
 
 function BinDeps.isexecutable(filepath)
     if isfile(filepath)
         res = false
         @unix_only begin
-            res = ccall(:access, Cint, (Ptr{Uint8}, Cint), filepath, 1) == 0
+            res = ccall(:access, Cint, (Ptr{UInt8}, Cint), filepath, 1) == 0
         end
         # unfortunately there is no easy way to tell if this process can execute a file on Windows
         @windows_only begin
-            res = true
+            res = any(map(x->endswith(filepath, x), win_case_pathext))
+            if res && (endswith(filepath, ".exe") || endswith(filepath, ".EXE"))
+                try
+                    # check for the DOS/Windows executable magic number 'MZ'
+                    res = read(filepath, UInt16) == 0x5a4d
+                catch
+                    res = false
+                end
+            end
         end
         if res
             return true
@@ -79,7 +94,7 @@ function BinDeps.isexecutable(filepath)
 end
 
 # constructor for ExecutableDependency and LibraryDependency
-@compat function (::Type{T}){T<:Dependency}(context::PackageContext, name; properties...)
+function _dependency{T<:Dependency}(::Type{T}, context::PackageContext, name; properties...)
     validate = successful_validate
     group = nothing
     for i in 1:length(properties)
@@ -126,12 +141,14 @@ macro setup()
         end
         @deprecate library_group(args...) dependency_group(args...)
         dependency_group(args...) = BinDeps.DependencyGroup(bindeps_context,args...)
-        library_dependency(args...; properties...) = BinDeps.LibraryDependency(
+        library_dependency(args...; properties...) = BinDeps._dependency(
+            BinDeps.LibraryDependency,
             bindeps_context,
             args...;
             properties...
         )
-        executable_dependency(args...; properties...) = BinDeps.ExecutableDependency(
+        executable_dependency(args...; properties...) = BinDeps._dependency(
+            BinDeps.ExecutableDependency,
             bindeps_context,
             args...;
             properties...
@@ -147,9 +164,6 @@ executable_dependency(args...; properties...) = error("No context provided. Did 
 # binary finders
 const has_which = try success(`which which`) catch e false end
 const has_where = try success(`where where`) catch e false end
-
-# normal contents of %PATHEXT% on Windows
-const win_pathext = (".COM", ".EXE", ".BAT", ".CMD", ".VBS", ".VBE", ".JS", ".JSE", ".WSF", ".WSH", ".MSC")
 
 abstract PackageManager <: DependencyProvider
 
@@ -481,7 +495,7 @@ function generate_steps(dep::Dependency, method)
     error("No provider or helper for method $method found for dependency $(dep.name)")
 end
 
-function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
+function generate_steps(dep::Dependency, h::Autotools,  provider_opts)
     if is(h.source, nothing)
         h.source = gethelper(dep,Sources)
     end
@@ -495,12 +509,34 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     opts[:prefix]   = usrdir(dep)
     opts[:builddir] = joinpath(builddir(dep),dep.name)
     merge!(opts,h.opts)
-    if haskey(opts,:installed_libname)
-        !haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),opts[:installed_libname])]
-        delete!(opts, :installed_libname)
-    elseif !haskey(opts,:installed_libpath)
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,ByteString[]))]
+    if isa(dep, LibraryDependency)
+        if haskey(opts, :installed_libname)
+            Base.warn_once("The `installed_libname` keyword is deprecated; please use `installed_name`")
+            opts[:installed_name] = opts[:installed_libname]
+        end
+        if haskey(opts, :installed_libpath)
+            Base.warn_once("The `installed_libpath` keyword is deprecated; please use `installed_path`")
+            opts[:installed_path] = opts[:installed_libpath]
+        end
+    end
+    if haskey(opts,:installed_name)
+        !haskey(opts,:installed_path) || error("Can't specify both installed_path and installed_name")
+        opts[:installed_path] = ByteString[joinpath(destdir(dep),opts[:installed_name])]
+        delete!(opts, :installed_name)
+    elseif !haskey(opts,:installed_path)
+        opts[:installed_path] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,ByteString[]))]
+
+        if isa(dep, LibraryDependency)
+            map!(opts[:installed_path]) do path
+                "$path.$dlext"
+            end
+        elseif isa(dep, ExecutableDependency)
+            @windows_only begin
+                mapreduce(vcat, ByteString[], opts[:installed_path]) do path
+                    vcat(path, ByteString["$path.$ext" for ext in win_pathext])
+                end
+            end
+        end
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
         opts[:libtarget] = ByteString[x*"."*dlext for x in stringarray(dep.properties[:aliases])]
@@ -556,8 +592,8 @@ function _find_dependency(dep::LibraryDependency; provider = Any)
         paths = AbstractString[]
 
         # Allow user to override installation path
-        if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
-            unshift!(paths,opts[:installed_libpath])
+        if haskey(opts,:installed_path) && isdir(opts[:installed_path])
+            unshift!(paths,opts[:installed_path])
         end
 
         ppaths = libdir(p,dep)
@@ -622,10 +658,9 @@ function _find_dependency(dep::ExecutableDependency; provider = Any)
         paths = AbstractString[]
 
         # Allow user to override installation path
-        # TODO: Figure out the equivalent for executables
-        # if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
-        #     unshift!(paths,opts[:installed_libpath])
-        # end
+        if haskey(opts, :installed_path) && isdir(opts[:installed_path])
+            unshift!(paths, opts[:installed_path])
+        end
 
         ppaths = bindir(p, dep)
         append!(paths, isa(ppaths,Array) ? ppaths : [ppaths])
@@ -712,8 +747,10 @@ end
             append!(paths, map!(chomp, suppress_stderr(()->readlines_default(`where $execname$ext`, empty))))
         end
     else
-        return empty
+        paths = empty
     end
+
+    return paths
 end
 
 function add_exec!(ret, dep, execpath)
@@ -1049,20 +1086,18 @@ macro install(_libmaps...)
                             end
                             """)
                         println(depsfile, "# Load dependencies")
-                        exec_deps = Dict()
                         for libkey in keys($libmaps)
                             cached = get(load_cache, string(libkey), nothing)
                             if cached !== nothing
                                 (dep, path) = cached
                                 if isa(dep, BinDeps.LibraryDependency)
                                     println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(path), "\"")
+                                elseif isa(dep, BinDeps.ExecutableDependency)
+                                    println(depsfile, $libmaps[libkey], " = \"", escape_string(path), "\"")
                                 else
-                                    exec_deps[$libmaps[libkey]] = escape_string(path)
+                                    error("Unrecognized dependency type: $(typeof(dep))")
                                 end
                             end
-                        end
-                        if !isempty(exec_deps)
-                            println(depsfile, "_exec = ", repr(exec_deps))
                         end
 
                         println(depsfile)

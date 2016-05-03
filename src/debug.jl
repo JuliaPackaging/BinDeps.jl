@@ -1,7 +1,8 @@
 import Base: show
 
-function _show_indented(io::IO, dep::LibraryDependency, indent, lib)
-    print_indented(io,"- Library \"$(dep.name)\"",indent+1)
+function _show_indented(io::IO, dep::Dependency, indent, lib)
+    deptype = isa(dep, LibraryDependency) ? "Library" : (isa(dep, ExecutableDependency) ? "Executable" : "")
+    print_indented(io,"- $deptype \"$(dep.name)\"",indent+1)
     if !applicable(dep)
         println(io," (not applicable to this system)")
     else
@@ -24,11 +25,11 @@ function _show_indented(io::IO, dep::LibraryDependency, indent, lib)
         end
     end
 end
-show_indented(io::IO, dep::LibraryDependency, indent) = _show_indented(io,dep,indent, applicable(dep) ? _find_library(dep) : nothing)
-show(io::IO, dep::LibraryDependency) = show_indented(io, dep, 0)
+show_indented(io::IO, dep::Dependency, indent) = _show_indented(io,dep,indent, applicable(dep) ? _find_dependency(dep) : nothing)
+show(io::IO, dep::Dependency) = show_indented(io, dep, 0)
 
-function show(io::IO, deps::LibraryGroup)
-    print(io," - Library Group \"$(deps.name)\"")
+function show(io::IO, deps::DependencyGroup)
+    print(io," - Dependency Group \"$(deps.name)\"")
     all = allf(deps)
     providers = satisfied_providers(deps,all)
     if providers != nothing && !(isempty(providers))

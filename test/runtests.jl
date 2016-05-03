@@ -11,3 +11,5 @@ using HttpParser
 
 # PR 171
 @test BinDeps.lower(nothing, nothing) === nothing
+
+include("testscripts/executable/build.jl")
