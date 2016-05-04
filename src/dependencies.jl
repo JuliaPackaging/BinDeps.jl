@@ -333,7 +333,8 @@ type CustomPathBinaries <: Binaries
     path::AbstractString
 end
 
-libdir(p::CustomPathBinaries,dep) = p.path
+libdir(p::CustomPathBinaries, dep) = p.path
+bindir(p::CustomPathBinaries, dep) = p.path
 
 abstract BuildProcess <: DependencyProvider
 
