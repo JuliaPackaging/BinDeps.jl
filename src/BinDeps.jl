@@ -11,6 +11,15 @@ module BinDeps
     const dlext = Libdl.dlext
     const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
 
+    # Do not change API on <= 0.4
+    if !isdefined(Core, :String) || !isdefined(Core, :AbstractString)
+        typealias _ASCIIString ASCIIString
+        typealias _ByteString ByteString
+    else
+        typealias _ASCIIString String
+        typealias _ByteString String
+    end
+
     function find_library(pkg,libname,files)
         Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
         dl = C_NULL
@@ -104,7 +113,7 @@ module BinDeps
                 return (`7z x $file -y -o$directory`)
             end
             error("I don't know how to unpack $file")
-        end 
+        end
     end
 
     type SynchronousStepCollection
@@ -153,12 +162,12 @@ module BinDeps
 
     type MakeTargets <: BuildStep
         dir::AbstractString
-        targets::Vector{ASCIIString}
+        targets::Vector{_ASCIIString}
         env::Dict
         MakeTargets(dir,target;env = Dict{AbstractString,AbstractString}()) = new(dir,target,env)
-        MakeTargets(target::Vector{ASCIIString};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
-        MakeTargets(target::ASCIIString;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
-        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",ASCIIString[],env)
+        MakeTargets(target::Vector{_ASCIIString};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
+        MakeTargets(target::_ASCIIString;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
+        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",_ASCIIString[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -170,11 +179,11 @@ module BinDeps
         include_dirs::Vector{AbstractString}
         lib_dirs::Vector{AbstractString}
         rpath_dirs::Vector{AbstractString}
-        installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
-    	config_status_dir::AbstractString
+        installed_libpath::Vector{_ByteString} # The library is considered installed if any of these paths exist
+        config_status_dir::AbstractString
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = _ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{_ByteString,_ByteString}()) =
             new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
@@ -185,7 +194,7 @@ module BinDeps
         description::AbstractString
         step::SynchronousStepCollection
         Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
-    end 
+    end
 
     type Choices <: BuildStep
         choices::Vector{Choice}
@@ -204,7 +213,7 @@ module BinDeps
             end
             while true
                 print("Plese select desired method: ")
-                method = symbol(chomp(readline(STDIN)))
+                method = @compat Symbol(chomp(readline(STDIN)))
                 for x in c.choices
                     if(method == x.name)
                         return run(x.step)
@@ -218,8 +227,8 @@ module BinDeps
     type CCompile <: BuildStep
         srcFile::AbstractString
         destFile::AbstractString
-        options::Vector{ASCIIString}
-        libs::Vector{ASCIIString}
+        options::Vector{_ASCIIString}
+        libs::Vector{_ASCIIString}
     end
 
     lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
