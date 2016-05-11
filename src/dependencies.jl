@@ -106,7 +106,7 @@ end
 can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
-    vers = ASCIIString[]
+    vers = Compat.ASCIIString[]
     lookfor_version = false
     for l in eachline(`apt-cache showpkg $(p.package)`)
         if startswith(l,"Version:")
@@ -437,13 +437,13 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     merge!(opts,h.opts)
     if haskey(opts,:installed_libname)
         !haskey(opts,:installed_libpath) || error("Can't specify both installed_libpath and installed_libname")
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),opts[:installed_libname])]
+        opts[:installed_libpath] = String[joinpath(libdir(dep),opts[:installed_libname])]
         delete!(opts, :installed_libname)
     elseif !haskey(opts,:installed_libpath)
-        opts[:installed_libpath] = ByteString[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,ByteString[]))]
+        opts[:installed_libpath] = String[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,String[]))]
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
-        opts[:libtarget] = ByteString[x*"."*dlext for x in stringarray(dep.properties[:aliases])]
+        opts[:libtarget] = String[x*"."*dlext for x in stringarray(dep.properties[:aliases])]
     end
     if !haskey(opts,:include_dirs)
         opts[:include_dirs] = AbstractString[]
@@ -465,7 +465,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     unshift!(opts[:lib_dirs],libdir(dep))
     unshift!(opts[:rpath_dirs],libdir(dep))
     unshift!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
-    env = Dict{ByteString,ByteString}()
+    env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
     @unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
@@ -488,7 +488,7 @@ const EXTENSIONS = ["", "." * Libdl.dlext]
 function _find_library(dep::LibraryDependency; provider = Any)
     ret = Any[]
     # Same as find_library, but with extra check defined by dep
-    libnames = [dep.name;get(dep.properties,:aliases,ASCIIString[])]
+    libnames = [dep.name;get(dep.properties,:aliases,String[])]
     # Make sure we keep the defaults first, but also look in the other directories
     providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]);dep.providers])
     for (p,opts) in providers

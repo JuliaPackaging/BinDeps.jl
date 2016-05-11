@@ -153,12 +153,12 @@ module BinDeps
 
     type MakeTargets <: BuildStep
         dir::AbstractString
-        targets::Vector{ASCIIString}
+        targets::Vector{String}
         env::Dict
         MakeTargets(dir,target;env = Dict{AbstractString,AbstractString}()) = new(dir,target,env)
-        MakeTargets(target::Vector{ASCIIString};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
-        MakeTargets(target::ASCIIString;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
-        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",ASCIIString[],env)
+        MakeTargets{S<:AbstractString}(target::Vector{S};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
+        MakeTargets(target::String;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
+        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -170,11 +170,11 @@ module BinDeps
         include_dirs::Vector{AbstractString}
         lib_dirs::Vector{AbstractString}
         rpath_dirs::Vector{AbstractString}
-        installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
-    	config_status_dir::AbstractString
+        installed_libpath::Vector{String} # The library is considered installed if any of these paths exist
+        config_status_dir::AbstractString
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) =
+        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = String[], force_rebuild=false, config_status_dir = "", env = Dict{String,String}()) =
             new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
@@ -218,8 +218,8 @@ module BinDeps
     type CCompile <: BuildStep
         srcFile::AbstractString
         destFile::AbstractString
-        options::Vector{ASCIIString}
-        libs::Vector{ASCIIString}
+        options::Vector{String}
+        libs::Vector{String}
     end
 
     lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
