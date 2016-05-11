@@ -989,7 +989,7 @@ macro load_dependencies(args...)
                 error("Can't deal with argument type $(typeof(arg1)). See usage instructions!")
             end
         end
-        s = symbol(sym)
+        s = Symbol(sym)
         errorcase = Expr(:block)
         push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.build() to install missing dependencies!")))
         push!(ret.args,quote
