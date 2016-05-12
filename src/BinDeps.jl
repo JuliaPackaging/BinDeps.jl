@@ -1,7 +1,7 @@
 isdefined(Base, :__precompile__) && __precompile__()
 module BinDeps
-    importall Base
     using Compat
+    import Compat.String
 
     export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
             Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -104,7 +104,7 @@ module BinDeps
                 return (`7z x $file -y -o$directory`)
             end
             error("I don't know how to unpack $file")
-        end 
+        end
     end
 
     type SynchronousStepCollection
@@ -153,12 +153,12 @@ module BinDeps
 
     type MakeTargets <: BuildStep
         dir::AbstractString
-        targets::Vector{ASCIIString}
+        targets::Vector{String}
         env::Dict
         MakeTargets(dir,target;env = Dict{AbstractString,AbstractString}()) = new(dir,target,env)
-        MakeTargets(target::Vector{ASCIIString};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
-        MakeTargets(target::ASCIIString;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
-        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",ASCIIString[],env)
+        MakeTargets{S<:AbstractString}(target::Vector{S};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
+        MakeTargets(target::String;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
+        MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
     end
 
     type AutotoolsDependency <: BuildStep
@@ -170,11 +170,11 @@ module BinDeps
         include_dirs::Vector{AbstractString}
         lib_dirs::Vector{AbstractString}
         rpath_dirs::Vector{AbstractString}
-        installed_libpath::Vector{ByteString} # The library is considered installed if any of these paths exist
-    	config_status_dir::AbstractString
+        installed_libpath::Vector{String} # The library is considered installed if any of these paths exist
+        config_status_dir::AbstractString
         force_rebuild::Bool
         env
-        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = ByteString[], force_rebuild=false, config_status_dir = "", env = Dict{ByteString,ByteString}()) = 
+        AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = String[], force_rebuild=false, config_status_dir = "", env = Dict{String,String}()) =
             new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
     end
 
@@ -185,7 +185,7 @@ module BinDeps
         description::AbstractString
         step::SynchronousStepCollection
         Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
-    end 
+    end
 
     type Choices <: BuildStep
         choices::Vector{Choice}
@@ -204,7 +204,7 @@ module BinDeps
             end
             while true
                 print("Plese select desired method: ")
-                method = symbol(chomp(readline(STDIN)))
+                method = Symbol(chomp(readline(STDIN)))
                 for x in c.choices
                     if(method == x.name)
                         return run(x.step)
@@ -218,8 +218,8 @@ module BinDeps
     type CCompile <: BuildStep
         srcFile::AbstractString
         destFile::AbstractString
-        options::Vector{ASCIIString}
-        libs::Vector{ASCIIString}
+        options::Vector{String}
+        libs::Vector{String}
     end
 
     lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
@@ -297,7 +297,7 @@ module BinDeps
     dest(b::BuildStep) = b.dest
 
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
-    function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection) 
+    function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
     	if(a.cwd==b.cwd)
   		append!(a.steps,b.steps)
     	else
@@ -354,14 +354,14 @@ module BinDeps
         end
     end
 
-    function adjust_env(env) 
+    function adjust_env(env)
         ret = similar(env)
         merge!(ret,ENV)
-        merge!(ret,env) #s.env overrides ENV 
+        merge!(ret,env) #s.env overrides ENV
         ret
     end
 
-    @unix_only function lower(a::MakeTargets,collection) 
+    @unix_only function lower(a::MakeTargets,collection)
         cmd = `make -j8`
         if(!isempty(a.dir))
             cmd = `$cmd -C $(a.dir)`
@@ -409,7 +409,7 @@ module BinDeps
         if s.force_rebuild
             @dependent_steps begin
                 RemoveDirectory(s.builddir)
-            end 
+            end
         end
 
         @unix_only @dependent_steps begin
