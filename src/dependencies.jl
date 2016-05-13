@@ -365,7 +365,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     @build_steps begin
         FileDownloader(string(h.uri),localfile)
-        ChecksumValidator(get(opts,:SHA,""),localfile)
+        ChecksumValidator(get(opts,:SHA,get(opts,:sha,"")),localfile)
         CreateDirectory(srcdir(dep))
         FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
     end
@@ -375,7 +375,7 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     steps = @build_steps begin
         FileDownloader(string(h.uri),localfile)
-        ChecksumValidator(get(opts,:SHA,""),localfile)
+        ChecksumValidator(get(opts,:SHA,get(opts,:sha,"")),localfile)
         FileUnpacker(localfile,depsdir(dep),get(opts,:unpacked_dir,"usr"))
     end
 end
