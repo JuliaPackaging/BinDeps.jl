@@ -4,11 +4,9 @@ using Base.Test
 using Compat
 using BinDeps
 
-Pkg.add("Cairo")  # Tests apt-get code paths
-Pkg.build("Cairo")
+Pkg.build("Cairo")  # Tests apt-get code paths
 using Cairo
-Pkg.add("HttpParser")  # Tests build-from-source code paths
-Pkg.build("HttpParser")
+Pkg.build("HttpParser")  # Tests build-from-source code paths
 using HttpParser
 
 # PR 171
