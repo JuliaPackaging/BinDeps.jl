@@ -31,10 +31,30 @@ end
 
 # List of allowed BinDeps provider keyword options
 const provider_kwopts = [
-    :unpacked_dir,
     :force_rebuild,
+    :force_depends,
     :filename,
     :sha,
+
+    # Build configuration
+    :libtarget,
+    :installed_libname,
+    :installed_libpath,
+    :include_dirs,
+    :lib_dirs,
+    :pkg_config_dirs,
+    :rpath_dirs,
+    :configure_subdir,
+    :unpacked_dir,
+
+    # Build environment
+    :env,
+    :os,
+
+    # Hooks
+    :preload,
+    :onload,
+    :validate,
 ]
 
 # Deprecated provider options.  If name is changing, map to the new name
