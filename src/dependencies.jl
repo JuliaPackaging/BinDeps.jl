@@ -468,8 +468,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
-    @unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
-    @windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
+    env["PATH"] = @static is_unix() ? bindir(dep)*":"*ENV["PATH"] : bindir(dep)*";"*ENV["PATH"]
     haskey(opts,:env) && merge!(env,opts[:env])
     opts[:env] = env
     if get(provider_opts,:force_rebuild,false)
@@ -508,7 +507,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
 
         # Windows, do you know what `lib` stands for???
-        @windows_only push!(paths,bindir(p,dep))
+        @static if is_windows() push!(paths,bindir(p,dep)) end
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
@@ -543,7 +542,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             opath = string(lib,ext)
             check_path!(ret,dep,opath)
         end
-        @linux_only begin
+        @static if is_linux()
             soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
             soname != C_NULL && check_path!(ret,dep,bytestring(soname))
         end
@@ -603,11 +602,11 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-if OS_NAME == :Darwin
+@static if is_apple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif OS_NAME == :Linux
+elseif is_linux()
     defaults = [PackageManager,SystemPaths,BuildProcess]
-elseif OS_NAME == :Windows
+elseif is_windows()
     defaults = [Binaries,PackageManager,SystemPaths]
 else
     defaults = [SystemPaths,BuildProcess]
