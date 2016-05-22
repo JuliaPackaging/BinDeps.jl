@@ -298,12 +298,12 @@ module BinDeps
 
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
     function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
-    	if(a.cwd==b.cwd)
-  		append!(a.steps,b.steps)
-    	else
-    		push!(a.steps,b)
-    	end
-    	a
+        if(a.cwd==b.cwd)
+          append!(a.steps,b.steps)
+        else
+            push!(a.steps,b)
+        end
+        a
     end
     (|)(a::SynchronousStepCollection,b::Function) = (lower(b,a);a)
     (|)(a::SynchronousStepCollection,b) = (lower(b,a);a)
@@ -383,9 +383,9 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
-    	prefix = @static is_windows() ? replace(replace(s.prefix,"\\","/"),"C:/","/c/") :
+        prefix = @static is_windows() ? replace(replace(s.prefix,"\\","/"),"C:/","/c/") :
                                         s.prefix
-    	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
+        cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
         env = adjust_env(s.env)
 
@@ -431,11 +431,11 @@ module BinDeps
             end
         end
 
-    	@static if is_windows()
+        @static if is_windows()
             @dependent_steps begin
-        		begin
+                begin
                     ChangeDirectory(s.src)
-        			@static if is_windows()
+                    @static if is_windows()
                         FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),
                                  setenv(`sh -c $cmdstring`,env))
                     end
@@ -443,30 +443,30 @@ module BinDeps
                     MakeTargets("install")
                 end
             end
-    	end
+        end
     end
 
     function run(f::Function)
-    	f()
+        f()
     end
 
     function run(s::FileRule)
         if(!any(map(isfile,s.file)))
             run(s.step)
-    		if(!any(map(isfile,s.file)))
-    			error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
-    		end
+            if(!any(map(isfile,s.file)))
+                error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
+            end
         end
     end
     function run(s::DirectoryRule)
-    	info("Attempting to Create directory $(s.dir)")
+        info("Attempting to Create directory $(s.dir)")
         if(!isdir(s.dir))
             run(s.step)
-    		if(!isdir(s.dir))
-    			error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
-    		end
-    	else
-    		info("Directory $(s.dir) already created")
+            if(!isdir(s.dir))
+                error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
+            end
+        else
+            info("Directory $(s.dir) already created")
         end
     end
 
@@ -486,15 +486,15 @@ module BinDeps
     end
     function run(s::SynchronousStepCollection)
         for x in s.steps
-    		if(!isempty(s.cwd))
-    			info("Changing Directory to $(s.cwd)")
-    			cd(s.cwd)
-    		end
+            if(!isempty(s.cwd))
+                info("Changing Directory to $(s.cwd)")
+                cd(s.cwd)
+            end
             run(x)
             if(!isempty(s.oldcwd))
-    			info("Changing Directory to $(s.oldcwd)")
-    			cd(s.oldcwd)
-    		end
+                info("Changing Directory to $(s.oldcwd)")
+                cd(s.oldcwd)
+            end
         end
     end
 
@@ -502,10 +502,10 @@ module BinDeps
 
     function prepare_src(depsdir,url, downloaded_file, directory_name)
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
-    	@build_steps begin
+        @build_steps begin
             FileDownloader(url,local_file)
             FileUnpacker(local_file,joinpath(depsdir,"src"),directory_name)
-    	end
+        end
     end
 
     function autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, confstatusdir)
@@ -514,7 +514,7 @@ module BinDeps
         srcdir = joinpath(depsdir,"src",directory)
         dir = joinpath(joinpath(depsdir,"builds"),directory)
         prepare_src(depsdir,url, downloaded_file,directory_name) |
-    	@build_steps begin
+        @build_steps begin
             AutotoolsDependency(srcdir=srcdir,prefix=prefix,builddir=dir,configure_options=configure_opts,libtarget=libname,installed_libpath=[joinpath(libdir,installed_libname)],config_status_dir=confstatusdir)
         end
     end
