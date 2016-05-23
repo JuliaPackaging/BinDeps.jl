@@ -76,7 +76,7 @@ module BinDeps
         end
     end
 
-    @static if is_unix()
+    if is_unix()
         function unpack_cmd(file,directory,extension,secondary_extension)
             if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
                 return (`tar xzf $file --directory=$directory`)
@@ -359,7 +359,7 @@ module BinDeps
         ret
     end
 
-    @static if is_unix()
+    if is_unix()
         function lower(a::MakeTargets,collection)
             cmd = `make -j8`
             if(!isempty(a.dir))
@@ -493,7 +493,7 @@ module BinDeps
         end
     end
 
-    make_command = @static is_unix() ? `make -j8` : `make`
+    make_command = is_unix() ? `make -j8` : `make`
 
     function prepare_src(depsdir,url, downloaded_file, directory_name)
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
