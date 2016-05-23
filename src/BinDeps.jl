@@ -47,7 +47,7 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in is_windows() ? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+            for download_engine in (is_windows() ? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
                 if download_engine == :powershell
                     checkcmd = `$download_engine -NoProfile -Command ""`
                 else
@@ -173,7 +173,10 @@ module BinDeps
         force_rebuild::Bool
         env
         AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = String[], force_rebuild=false, config_status_dir = "", env = Dict{String,String}()) =
-            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
+            new(srcdir, prefix, builddir, configure_options,
+                isa(libtarget,Vector) ? libtarget : AbstractString[libtarget],
+                include_dirs, lib_dirs, rpath_dirs, installed_libpath,
+                config_status_dir, force_rebuild, env)
     end
 
     ### Choices
@@ -371,7 +374,7 @@ module BinDeps
             @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
         end
     else
-        lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), )
+        lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), )
     end
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
@@ -419,7 +422,7 @@ module BinDeps
                 begin
                     ChangeDirectory(s.builddir)
                     @static if is_unix()
-                        FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),
+                        FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),
                                  setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
                     end
                     FileRule(s.libtarget,MakeTargets(;env=s.env))
@@ -431,7 +434,7 @@ module BinDeps
                 begin
                     ChangeDirectory(s.src)
                     @static if is_windows()
-                        FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),
+                        FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),
                                  setenv(`sh -c $cmdstring`,env))
                     end
                     FileRule(s.libtarget,MakeTargets())
