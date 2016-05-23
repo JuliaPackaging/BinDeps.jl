@@ -47,7 +47,7 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+            for download_engine in (is_windows() ? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
                 if download_engine == :powershell
                     checkcmd = `$download_engine -NoProfile -Command ""`
                 else
@@ -76,7 +76,7 @@ module BinDeps
         end
     end
 
-    @unix_only begin
+    if is_unix()
         function unpack_cmd(file,directory,extension,secondary_extension)
             if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
                 return (`tar xzf $file --directory=$directory`)
@@ -93,9 +93,7 @@ module BinDeps
             end
             error("I don't know how to unpack $file")
         end
-    end
-
-    @windows_only begin
+    else
         function unpack_cmd(file,directory,extension,secondary_extension)
             if((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                    secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
@@ -175,7 +173,10 @@ module BinDeps
         force_rebuild::Bool
         env
         AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = String[], force_rebuild=false, config_status_dir = "", env = Dict{String,String}()) =
-            new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
+            new(srcdir, prefix, builddir, configure_options,
+                isa(libtarget,Vector) ? libtarget : AbstractString[libtarget],
+                include_dirs, lib_dirs, rpath_dirs, installed_libpath,
+                config_status_dir, force_rebuild, env)
     end
 
     ### Choices
@@ -298,12 +299,12 @@ module BinDeps
 
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
     function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
-    	if(a.cwd==b.cwd)
-  		append!(a.steps,b.steps)
-    	else
-    		push!(a.steps,b)
-    	end
-    	a
+        if(a.cwd==b.cwd)
+            append!(a.steps,b.steps)
+        else
+            push!(a.steps,b)
+        end
+        a
     end
     (|)(a::SynchronousStepCollection,b::Function) = (lower(b,a);a)
     (|)(a::SynchronousStepCollection,b) = (lower(b,a);a)
@@ -361,17 +362,20 @@ module BinDeps
         ret
     end
 
-    @unix_only function lower(a::MakeTargets,collection)
-        cmd = `make -j8`
-        if(!isempty(a.dir))
-            cmd = `$cmd -C $(a.dir)`
+    if is_unix()
+        function lower(a::MakeTargets,collection)
+            cmd = `make -j8`
+            if(!isempty(a.dir))
+                cmd = `$cmd -C $(a.dir)`
+            end
+            if(!isempty(a.targets))
+                cmd = `$cmd $(a.targets)`
+            end
+            @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
         end
-        if(!isempty(a.targets))
-            cmd = `$cmd $(a.targets)`
-        end
-        @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
+    else
+        lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), )
     end
-    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), )
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
     lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -379,9 +383,9 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
-    	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
-    	@unix_only prefix = s.prefix
-    	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
+        prefix = @static is_windows() ? replace(replace(s.prefix,"\\","/"),"C:/","/c/") :
+                                        s.prefix
+        cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
         env = adjust_env(s.env)
 
@@ -412,47 +416,55 @@ module BinDeps
             end
         end
 
-        @unix_only @dependent_steps begin
-            CreateDirectory(s.builddir)
-            begin
-                ChangeDirectory(s.builddir)
-                @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
-                FileRule(s.libtarget,MakeTargets(;env=s.env))
-                MakeTargets("install";env=env)
+        @static if is_unix()
+            @dependent_steps begin
+                CreateDirectory(s.builddir)
+                begin
+                    ChangeDirectory(s.builddir)
+                    @static if is_unix()
+                        FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),
+                                 setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
+                    end
+                    FileRule(s.libtarget,MakeTargets(;env=s.env))
+                    MakeTargets("install";env=env)
+                end
+            end
+        else
+            @dependent_steps begin
+                begin
+                    ChangeDirectory(s.src)
+                    @static if is_windows()
+                        FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),
+                                 setenv(`sh -c $cmdstring`,env))
+                    end
+                    FileRule(s.libtarget,MakeTargets())
+                    MakeTargets("install")
+                end
             end
         end
-
-    	@windows_only @dependent_steps begin
-    		begin
-                ChangeDirectory(s.src)
-    			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
-                FileRule(s.libtarget,MakeTargets())
-                MakeTargets("install")
-            end
-    	end
     end
 
     function run(f::Function)
-    	f()
+        f()
     end
 
     function run(s::FileRule)
         if(!any(map(isfile,s.file)))
             run(s.step)
-    		if(!any(map(isfile,s.file)))
-    			error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
-    		end
+            if(!any(map(isfile,s.file)))
+                error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
+            end
         end
     end
     function run(s::DirectoryRule)
-    	info("Attempting to Create directory $(s.dir)")
+        info("Attempting to Create directory $(s.dir)")
         if(!isdir(s.dir))
             run(s.step)
-    		if(!isdir(s.dir))
-    			error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
-    		end
-    	else
-    		info("Directory $(s.dir) already created")
+            if(!isdir(s.dir))
+                error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
+            end
+        else
+            info("Directory $(s.dir) already created")
         end
     end
 
@@ -472,27 +484,26 @@ module BinDeps
     end
     function run(s::SynchronousStepCollection)
         for x in s.steps
-    		if(!isempty(s.cwd))
-    			info("Changing Directory to $(s.cwd)")
-    			cd(s.cwd)
-    		end
+            if(!isempty(s.cwd))
+                info("Changing Directory to $(s.cwd)")
+                cd(s.cwd)
+            end
             run(x)
             if(!isempty(s.oldcwd))
-    			info("Changing Directory to $(s.oldcwd)")
-    			cd(s.oldcwd)
-    		end
+                info("Changing Directory to $(s.oldcwd)")
+                cd(s.oldcwd)
+            end
         end
     end
 
-    @unix_only make_command = `make -j8`
-    @windows_only make_command = `make`
+    make_command = is_unix() ? `make -j8` : `make`
 
     function prepare_src(depsdir,url, downloaded_file, directory_name)
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
-    	@build_steps begin
+        @build_steps begin
             FileDownloader(url,local_file)
             FileUnpacker(local_file,joinpath(depsdir,"src"),directory_name)
-    	end
+        end
     end
 
     function autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, directory, libname, installed_libname, confstatusdir)
@@ -501,7 +512,7 @@ module BinDeps
         srcdir = joinpath(depsdir,"src",directory)
         dir = joinpath(joinpath(depsdir,"builds"),directory)
         prepare_src(depsdir,url, downloaded_file,directory_name) |
-    	@build_steps begin
+        @build_steps begin
             AutotoolsDependency(srcdir=srcdir,prefix=prefix,builddir=dir,configure_options=configure_opts,libtarget=libname,installed_libpath=[joinpath(libdir,installed_libname)],config_status_dir=confstatusdir)
         end
     end
