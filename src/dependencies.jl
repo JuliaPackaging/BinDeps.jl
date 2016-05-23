@@ -602,7 +602,7 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-@static if is_apple()
+if is_apple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
 elseif is_linux()
     defaults = [PackageManager,SystemPaths,BuildProcess]

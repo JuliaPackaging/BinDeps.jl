@@ -47,7 +47,7 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in @static is_windows() ? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+            for download_engine in is_windows() ? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
                 if download_engine == :powershell
                     checkcmd = `$download_engine -NoProfile -Command ""`
                 else
@@ -93,9 +93,7 @@ module BinDeps
             end
             error("I don't know how to unpack $file")
         end
-    end
-
-    @static if is_windows()
+    else
         function unpack_cmd(file,directory,extension,secondary_extension)
             if((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                    secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
@@ -299,7 +297,7 @@ module BinDeps
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
     function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
         if(a.cwd==b.cwd)
-          append!(a.steps,b.steps)
+            append!(a.steps,b.steps)
         else
             push!(a.steps,b)
         end
@@ -372,8 +370,7 @@ module BinDeps
             end
             @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
         end
-    end
-    @static if is_windows()
+    else
         lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), )
     end
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
@@ -429,9 +426,7 @@ module BinDeps
                     MakeTargets("install";env=env)
                 end
             end
-        end
-
-        @static if is_windows()
+        else
             @dependent_steps begin
                 begin
                     ChangeDirectory(s.src)
