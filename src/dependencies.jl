@@ -57,7 +57,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),Dict{Symbol=>Any}([name => value for (name,value) in properties]),validate)
+    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),Dict{Symbol, Any}([name => value for (name,value) in properties]),validate)
     if group !== nothing
         push!(group.deps,r)
     else
@@ -291,8 +291,8 @@ provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; op
 @compat provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
-provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Doct{Symbol=>Any}([k=>v for (k,v) in opts])))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol=>Any}([k=>v for (k,v) in opts])))
+provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol, Any}([k=>v for (k,v) in opts])))
+provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol, Any}([k=>v for (k,v) in opts])))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
 function provides{T}(::Type{T},packages::AbstractArray,dep::LibraryDependency; opts...)
     for p in packages
