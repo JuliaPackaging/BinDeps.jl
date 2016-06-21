@@ -298,12 +298,12 @@ module BinDeps
 
     (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
     function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
-      if(a.cwd==b.cwd)
-      append!(a.steps,b.steps)
-      else
-        push!(a.steps,b)
-      end
-      a
+        if(a.cwd==b.cwd)
+            append!(a.steps,b.steps)
+        else
+            push!(a.steps,b)
+        end
+        a
     end
     (|)(a::SynchronousStepCollection,b::Function) = (lower(b,a);a)
     (|)(a::SynchronousStepCollection,b) = (lower(b,a);a)
@@ -383,11 +383,11 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
-	    @static if is_windows()
-		    prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
+        @static if is_windows()
+            prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
         elseif is_unix()
-		    prefix = s.prefix
-		end
+            prefix = s.prefix
+        end
         cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
         env = adjust_env(s.env)
@@ -424,8 +424,8 @@ module BinDeps
             begin
                 ChangeDirectory(s.builddir)
                 @static if is_unix()
-				    (FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env)))
-				end
+                    (FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env)))
+                end
                 FileRule(s.libtarget,MakeTargets(;env=s.env))
                 MakeTargets("install";env=env)
             end
@@ -433,8 +433,8 @@ module BinDeps
         elseif is_windows() @dependent_steps begin
             ChangeDirectory(s.src)
             @static if is_windows()
-		        FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
-		    end
+                FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
+            end
             FileRule(s.libtarget,MakeTargets())
             MakeTargets("install")
         end
@@ -494,10 +494,10 @@ module BinDeps
     end
 
     @static if is_unix()  
-	    make_command = `make -j8`
+        make_command = `make -j8`
     elseif is_windows() 
-	    make_command = `make`
-	end
+        make_command = `make`
+    end
 
     function prepare_src(depsdir,url, downloaded_file, directory_name)
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
