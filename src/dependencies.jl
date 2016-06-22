@@ -57,7 +57,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),(Symbol=>Any)[name => value for (name,value) in properties],validate)
+    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),Dict{Symbol, Any}([name => value for (name,value) in properties]),validate)
     if group !== nothing
         push!(group.deps,r)
     else
@@ -103,7 +103,7 @@ const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e fal
 type AptGet <: PackageManager
     package::AbstractString
 end
-can_use(::Type{AptGet}) = has_apt && OS_NAME == :Linux
+can_use(::Type{AptGet}) = has_apt && Sys.KERNEL == :Linux
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
     vers = Compat.ASCIIString[]
@@ -139,7 +139,7 @@ const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Yum}) = has_yum && OS_NAME == :Linux
+can_use(::Type{Yum}) = has_yum && Sys.KERNEL == :Linux
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
 function available_version(y::Yum)
     uname = readchomp(`uname -m`)
@@ -168,7 +168,7 @@ const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Pacman}) = has_pacman && OS_NAME == :Linux
+can_use(::Type{Pacman}) = has_pacman && Sys.KERNEL == :Linux
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
@@ -200,7 +200,7 @@ const has_zypper = try success(`zypper --version`) catch e false end
 type Zypper <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Zypper}) = has_zypper && OS_NAME == :Linux
+can_use(::Type{Zypper}) = has_zypper && Sys.KERNEL == :Linux
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
@@ -291,8 +291,8 @@ provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; op
 @compat provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
-provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,(Symbol=>Any)[k=>v for (k,v) in opts]))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,(Symbol=>Any)[k=>v for (k,v) in opts]))
+provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol, Any}([k=>v for (k,v) in opts])))
+provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol, Any}([k=>v for (k,v) in opts])))
 provides{T}(::Type{T},p,dep::LibraryDependency; opts...) = provides(provider(T,p; opts...),dep; opts...)
 function provides{T}(::Type{T},packages::AbstractArray,dep::LibraryDependency; opts...)
     for p in packages
@@ -468,8 +468,11 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
-    @unix_only env["PATH"] = bindir(dep)*":"*ENV["PATH"]
-    @windows_only env["PATH"] = bindir(dep)*";"*ENV["PATH"]
+    @static if is_unix() 
+	    env["PATH"] = bindir(dep)*":"*ENV["PATH"]
+	elseif is_windows()
+	    env["PATH"] = bindir(dep)*";"*ENV["PATH"]
+	end
     haskey(opts,:env) && merge!(env,opts[:env])
     opts[:env] = env
     if get(provider_opts,:force_rebuild,false)
@@ -508,7 +511,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
 
         # Windows, do you know what `lib` stands for???
-        @windows_only push!(paths,bindir(p,dep))
+        @static if is_windows(); push!(paths,bindir(p,dep)); end
         (isempty(paths) || all(map(isempty,paths))) && continue
         for lib in libnames, path in paths
             l = joinpath(path, lib)
@@ -543,7 +546,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             opath = string(lib,ext)
             check_path!(ret,dep,opath)
         end
-        @linux_only begin
+        @static if is_linux()
             soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
             soname != C_NULL && check_path!(ret,dep,bytestring(soname))
         end
@@ -603,11 +606,11 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-if OS_NAME == :Darwin
+if Sys.KERNEL == :Darwin
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif OS_NAME == :Linux
+elseif Sys.KERNEL == :Linux
     defaults = [PackageManager,SystemPaths,BuildProcess]
-elseif OS_NAME == :Windows
+elseif Sys.KERNEL == :Windows
     defaults = [Binaries,PackageManager,SystemPaths]
 else
     defaults = [SystemPaths,BuildProcess]
@@ -615,7 +618,7 @@ end
 
 function applicable(dep::LibraryDependency)
     if haskey(dep.properties,:os)
-        if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(OS_NAME))
+        if (dep.properties[:os] != Sys.KERNEL && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Base.is_unix(Sys.KERNEL))
             return false
         end
     elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
@@ -627,7 +630,7 @@ end
 applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != Sys.KERNEL && (opts[:os] != :Unix || !Base.is_unix(Sys.KERNEL)))
         return false
     end
     if !haskey(opts,:validate)
@@ -640,7 +643,7 @@ function can_provide(p,opts,dep)
 end
 
 function can_provide(p::PackageManager,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !Base.is_unix(OS_NAME)))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != Sys.KERNEL && (opts[:os] != :Unix || !Base.is_unix(Sys.KERNEL)))
         return false
     end
     if !package_available(p)
