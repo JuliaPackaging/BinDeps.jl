@@ -47,7 +47,7 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in @windows? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+            for download_engine in @static is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
                     :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
                 if endswith(string(download_engine), "powershell")
                     checkcmd = `$download_engine -NoProfile -Command ""`
@@ -78,7 +78,7 @@ module BinDeps
         end
     end
 
-    @unix_only begin
+    if is_unix()
         function unpack_cmd(file,directory,extension,secondary_extension)
             if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
                 return (`tar xzf $file --directory=$directory`)
@@ -97,7 +97,7 @@ module BinDeps
         end
     end
 
-    @windows_only begin
+    if is_windows()
         function unpack_cmd(file,directory,extension,secondary_extension)
             if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                     secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
@@ -364,17 +364,19 @@ module BinDeps
         ret
     end
 
-    @unix_only function lower(a::MakeTargets,collection)
-        cmd = `make -j8`
-        if(!isempty(a.dir))
-            cmd = `$cmd -C $(a.dir)`
+    if is_unix()
+        function lower(a::MakeTargets,collection)
+            cmd = `make -j8`
+            if(!isempty(a.dir))
+                cmd = `$cmd -C $(a.dir)`
+            end
+            if(!isempty(a.targets))
+                cmd = `$cmd $(a.targets)`
+            end
+            @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
         end
-        if(!isempty(a.targets))
-            cmd = `$cmd $(a.targets)`
-        end
-        @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
-    @windows_only lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), )
+    is_windows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), ))
     lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
     lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -382,8 +384,12 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
-    	@windows_only prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
-    	@unix_only prefix = s.prefix
+        @static if is_windows()
+            prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
+        end
+        @static if is_unix()
+            prefix = s.prefix
+        end
     	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
         env = adjust_env(s.env)
@@ -415,24 +421,28 @@ module BinDeps
             end
         end
 
-        @unix_only @dependent_steps begin
-            CreateDirectory(s.builddir)
-            begin
-                ChangeDirectory(s.builddir)
-                @unix_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
-                FileRule(s.libtarget,MakeTargets(;env=s.env))
-                MakeTargets("install";env=env)
+        @static if is_unix()
+            @dependent_steps begin
+                CreateDirectory(s.builddir)
+                begin
+                    ChangeDirectory(s.builddir)
+                    FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
+                    FileRule(s.libtarget,MakeTargets(;env=s.env))
+                    MakeTargets("install";env=env)
+                end
             end
         end
 
-    	@windows_only @dependent_steps begin
-    		begin
-                ChangeDirectory(s.src)
-    			@windows_only FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
-                FileRule(s.libtarget,MakeTargets())
-                MakeTargets("install")
+        @static if is_windows() 
+            @dependent_steps begin
+                begin
+                    ChangeDirectory(s.src)
+                    FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
+                    FileRule(s.libtarget,MakeTargets())
+                    MakeTargets("install")
+                end
             end
-    	end
+        end
     end
 
     function run(f::Function)
@@ -487,8 +497,8 @@ module BinDeps
         end
     end
 
-    @unix_only make_command = `make -j8`
-    @windows_only make_command = `make`
+    is_unix() && (make_command = `make -j8`)
+    is_windows() && (make_command = `make`)
 
     function prepare_src(depsdir,url, downloaded_file, directory_name)
         local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
