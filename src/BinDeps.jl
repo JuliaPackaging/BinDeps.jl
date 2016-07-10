@@ -47,8 +47,9 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in @windows? (:powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
-                if download_engine == :powershell
+            for download_engine in @windows? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+                    :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+                if endswith(string(download_engine), "powershell")
                     checkcmd = `$download_engine -NoProfile -Command ""`
                 else
                     checkcmd = `$download_engine --help`
@@ -64,15 +65,16 @@ module BinDeps
             end
         end
         if downloadcmd == :wget
-            return `wget -O $filename $url`
+            return `$downloadcmd -O $filename $url`
         elseif downloadcmd == :curl
-            return `curl -f -o $filename -L $url`
+            return `$downloadcmd -f -o $filename -L $url`
         elseif downloadcmd == :fetch
-            return `fetch -f $filename $url`
-        elseif downloadcmd == :powershell
-            return `powershell -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
+            return `$downloadcmd -f $filename $url`
+        elseif endswith(string(downloadcmd), "powershell")
+            return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
         else
-            error("No download agent available; install curl, wget, or fetch.")
+            extraerr = @windows? "check if powershell is on your path or " : ""
+            error("No download agent available; $(extraerr)install curl, wget, or fetch.")
         end
     end
 
