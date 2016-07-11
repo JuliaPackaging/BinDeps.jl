@@ -97,10 +97,11 @@ module BinDeps
 
     @windows_only begin
         function unpack_cmd(file,directory,extension,secondary_extension)
-            if((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
-                   secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
+            if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
+                    secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
                 return pipeline(`7z x $file -y -so`, `7z x -si -y -ttar -o$directory`)
-            elseif extension == ".zip" || extension == ".7z" || extension == ".tar"
+            elseif (extension == ".zip" || extension == ".7z" || extension == ".tar" ||
+                    (extension == ".exe" && secondary_extension == ".7z"))
                 return (`7z x $file -y -o$directory`)
             end
             error("I don't know how to unpack $file")
