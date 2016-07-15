@@ -467,10 +467,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
-    @static if is_unix()
+    if is_unix()
         env["PATH"] = bindir(dep)*":"*ENV["PATH"]
-    end
-    @static if is_windows()
+    elseif is_windows()
         env["PATH"] = bindir(dep)*";"*ENV["PATH"]
     end
     haskey(opts,:env) && merge!(env,opts[:env])
@@ -511,7 +510,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
 
         # Windows, do you know what `lib` stands for???
-        @static if is_windows()
+        if is_windows()
             push!(paths,bindir(p,dep))
         end
         (isempty(paths) || all(map(isempty,paths))) && continue

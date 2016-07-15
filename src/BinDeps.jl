@@ -47,7 +47,7 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in @static is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+            for download_engine in is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
                     :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
                 if endswith(string(download_engine), "powershell")
                     checkcmd = `$download_engine -NoProfile -Command ""`
@@ -384,10 +384,9 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
-        @static if is_windows()
+        if is_windows()
             prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
-        end
-        @static if is_unix()
+        elseif is_unix()
             prefix = s.prefix
         end
     	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
