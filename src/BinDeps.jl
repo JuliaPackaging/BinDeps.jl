@@ -47,8 +47,8 @@ module BinDeps
     function download_cmd(url::AbstractString, filename::AbstractString)
         global downloadcmd
         if downloadcmd === nothing
-            for download_engine in is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
-                    :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch)
+            for download_engine in (is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+                    :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
                 if endswith(string(download_engine), "powershell")
                     checkcmd = `$download_engine -NoProfile -Command ""`
                 else
@@ -434,12 +434,10 @@ module BinDeps
 
         @static if is_windows() 
             @dependent_steps begin
-                begin
-                    ChangeDirectory(s.src)
-                    FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
-                    FileRule(s.libtarget,MakeTargets())
-                    MakeTargets("install")
-                end
+                ChangeDirectory(s.src)
+                FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
+                FileRule(s.libtarget,MakeTargets())
+                MakeTargets("install")
             end
         end
     end
