@@ -384,10 +384,9 @@ module BinDeps
     #run(s::MakeTargets) = run(@make_steps (s,))
 
     function lower(s::AutotoolsDependency,collection)
+        prefix = s.prefix
         if is_windows()
             prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
-        elseif is_unix()
-            prefix = s.prefix
         end
     	cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
