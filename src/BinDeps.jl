@@ -207,7 +207,7 @@ module BinDeps
             end
             while true
                 print("Plese select desired method: ")
-                method = Symbol(chomp(readline(STDIN)))
+                method = @compat Symbol(chomp(readline(STDIN)))
                 for x in c.choices
                     if(method == x.name)
                         return run(x.step)
