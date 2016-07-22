@@ -1,6 +1,6 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 import Base: show
-const OSNAME = @static is_windows() ? :Windows : Compat.KERNEL
+const OSNAME = is_windows() ? :Windows : Compat.KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract DependencyProvider
@@ -645,8 +645,7 @@ function can_provide(p,opts,dep)
 end
 
 function can_provide(p::PackageManager,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && 
-        (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !is_unix()))
         return false
     end
     if !package_available(p)
