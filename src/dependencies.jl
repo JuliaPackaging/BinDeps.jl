@@ -619,7 +619,7 @@ end
 
 function applicable(dep::LibraryDependency)
     if haskey(dep.properties,:os)
-        if (dep.properties[:os] != OS_NAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !is_unix())
+        if (dep.properties[:os] != Compat.KERNEL && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !is_unix())
             return false
         end
     elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
@@ -631,7 +631,7 @@ end
 applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != Compat.KERNEL && (opts[:os] != :Unix || !is_unix()))
         return false
     end
     if !haskey(opts,:validate)
@@ -644,7 +644,7 @@ function can_provide(p,opts,dep)
 end
 
 function can_provide(p::PackageManager,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OS_NAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != Compat.KERNEL && (opts[:os] != :Unix || !is_unix()))
         return false
     end
     if !package_available(p)
