@@ -73,7 +73,7 @@ module BinDeps
         elseif endswith(string(downloadcmd), "powershell")
             return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
         else
-            extraerr = @windows? "check if powershell is on your path or " : ""
+            extraerr = is_windows() ? "check if powershell is on your path or " : ""
             error("No download agent available; $(extraerr)install curl, wget, or fetch.")
         end
     end
