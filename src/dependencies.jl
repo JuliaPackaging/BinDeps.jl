@@ -550,7 +550,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
         @static if is_linux()
             soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
-            soname != C_NULL && check_path!(ret,dep,bytestring(soname))
+            soname != C_NULL && check_path!(ret,dep,unsafe_string(soname))
         end
     end
     return ret
