@@ -860,14 +860,15 @@ macro install(_libmaps...)
                         end
 
                         # Generate "deps.jl" file for runtime loading
-                        depsfile = open(joinpath(splitdir(Base.source_path())[1],"deps.jl"), "w")
-                        println(depsfile,
+                        depsfile_location = joinpath(splitdir(Base.source_path())[1],"deps.jl")
+                        depsfile_buffer = IOBuffer()
+                        println(depsfile_buffer,
                             """
                             # This is an auto-generated file; do not edit
                             """)
-                        println(depsfile, "# Pre-hooks")
-                        println(depsfile, join(pre_hooks, "\n"))
-                        println(depsfile,
+                        println(depsfile_buffer, "# Pre-hooks")
+                        println(depsfile_buffer, join(pre_hooks, "\n"))
+                        println(depsfile_buffer,
                             """
                             # Macro to load a library
                             macro checked_lib(libname, path)
@@ -875,15 +876,21 @@ macro install(_libmaps...)
                                 quote const \$(esc(libname)) = \$path end
                             end
                             """)
-                        println(depsfile, "# Load dependencies")
+                        println(depsfile_buffer, "# Load dependencies")
                         for libkey in keys($libmaps)
                             ((cached = get(load_cache,string(libkey),nothing)) === nothing) && continue
-                            println(depsfile, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
+                            println(depsfile_buffer, "@checked_lib ", $libmaps[libkey], " \"", escape_string(cached), "\"")
                         end
-                        println(depsfile)
-                        println(depsfile, "# Load-hooks")
-                        println(depsfile, join(load_hooks,"\n"))
-                        close(depsfile)
+                        println(depsfile_buffer)
+                        println(depsfile_buffer, "# Load-hooks")
+                        println(depsfile_buffer, join(load_hooks,"\n"))
+                        depsfile_content = takebuf_string(depsfile_buffer)
+                        if !isfile(depsfile_location) || readstring(depsfile_location) != depsfile_content
+                            # only overwrite if deps.jl file does not yet exist or content has changed
+                            open(depsfile_location, "w") do depsfile
+                                print(depsfile, depsfile_content)
+                            end
+                        end
                     end
                 end))
         if !(typeof(libmaps) <: Associative)
