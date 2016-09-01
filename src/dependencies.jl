@@ -884,11 +884,11 @@ macro install(_libmaps...)
                         println(depsfile_buffer)
                         println(depsfile_buffer, "# Load-hooks")
                         println(depsfile_buffer, join(load_hooks,"\n"))
-                        depsfile_content = takebuf_string(depsfile_buffer)
-                        if !isfile(depsfile_location) || readstring(depsfile_location) != depsfile_content
+                        depsfile_content = chomp(takebuf_string(depsfile_buffer))
+                        if !isfile(depsfile_location) || readchomp(depsfile_location) != depsfile_content
                             # only overwrite if deps.jl file does not yet exist or content has changed
                             open(depsfile_location, "w") do depsfile
-                                print(depsfile, depsfile_content)
+                                println(depsfile, depsfile_content)
                             end
                         end
                     end
