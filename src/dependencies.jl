@@ -415,20 +415,20 @@ stringarray(s) = s
 
 function generate_steps(dep::LibraryDependency,method)
     (p,opts) = getoneprovider(dep,method)
-    !is(p,nothing) && return generate_steps(p,dep,opts)
+    p !== nothing && return generate_steps(p,dep,opts)
     (p,hopts) = gethelper(dep,method)
-    !is(p,nothing) && return generate_steps(p,dep,hopts)
+    p !== nothing && return generate_steps(p,dep,hopts)
     error("No provider or helper for method $method found for dependency $(dep.name)")
 end
 
 function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
-    if is(h.source, nothing)
+    if h.source === nothing
         h.source = gethelper(dep,Sources)
     end
     if isa(h.source,Sources)
         h.source = (h.source,Dict{Symbol,Any}())
     end
-    is(h.source[1], nothing) && error("Could not obtain sources for dependency $(dep.name)")
+    h.source[1] === nothing && error("Could not obtain sources for dependency $(dep.name)")
     steps = lower(generate_steps(dep,h.source...))
     opts = Dict()
     opts[:srcdir]   = srcdir(dep,h.source...)
