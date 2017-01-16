@@ -777,7 +777,7 @@ function satisfy!(dep::LibraryDependency, methods = defaults)
     if !isempty(sp)
         for m in methods
             for s in sp
-                if s <: m || s <: SystemPaths
+                if s <: m
                     return s
                 end
             end
