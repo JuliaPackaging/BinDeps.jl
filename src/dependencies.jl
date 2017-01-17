@@ -1,6 +1,6 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 import Base: show
-const OSNAME = is_windows() ? :Windows : Compat.KERNEL
+const OSNAME = is_windows() ? :Windows : KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract DependencyProvider
@@ -18,8 +18,8 @@ end
 type LibraryDependency
     name::AbstractString
     context::PackageContext
-    providers::Vector{@compat Tuple{DependencyProvider,Dict{Symbol,Any}}}
-    helpers::Vector{@compat Tuple{DependencyHelper,Dict{Symbol,Any}}}
+    providers::Vector{Tuple{DependencyProvider,Dict{Symbol,Any}}}
+    helpers::Vector{Tuple{DependencyHelper,Dict{Symbol,Any}}}
     properties::Dict{Symbol,Any}
     libvalidate::Function
 end
@@ -57,7 +57,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(@compat(Tuple{DependencyProvider,Dict{Symbol,Any}}),0),Array(@compat(Tuple{DependencyHelper,Dict{Symbol,Any}}),0),Dict{Symbol,Any}(properties),validate)
+    r = LibraryDependency(name,context,Array(Tuple{DependencyProvider,Dict{Symbol,Any}},0),Array(Tuple{DependencyHelper,Dict{Symbol,Any}},0),Dict{Symbol,Any}(properties),validate)
     if group !== nothing
         push!(group.deps,r)
     else
@@ -288,7 +288,7 @@ provider(::Type{Binaries},uri::URI; opts...) = RemoteBinaries(uri)
 provider(::Type{Binaries},path::AbstractString; opts...) = CustomPathBinaries(path)
 provider(::Type{SimpleBuild},steps; opts...) = SimpleBuild(steps)
 provider{T<:BuildProcess}(::Type{BuildProcess},p::T; opts...) = provider(T,p; opts...)
-@compat provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
+provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
 provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol,Any}(opts)))
@@ -884,7 +884,11 @@ macro install(_libmaps...)
                         println(depsfile_buffer)
                         println(depsfile_buffer, "# Load-hooks")
                         println(depsfile_buffer, join(load_hooks,"\n"))
-                        depsfile_content = chomp(takebuf_string(depsfile_buffer))
+                        if VERSION < v"0.6.0-dev.1256"
+                            depsfile_content = chomp(takebuf_string(depsfile_buffer))
+                        else
+                            depsfile_content = chomp(String(take!(depsfile_buffer)))
+                        end
                         if !isfile(depsfile_location) || readchomp(depsfile_location) != depsfile_content
                             # only overwrite if deps.jl file does not yet exist or content has changed
                             open(depsfile_location, "w") do depsfile
@@ -1001,7 +1005,7 @@ macro load_dependencies(args...)
                 error("Can't deal with argument type $(typeof(arg1)). See usage instructions!")
             end
         end
-        s = @compat Symbol(sym)
+        s = Symbol(sym)
         errorcase = Expr(:block)
         push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.build() to install missing dependencies!")))
         push!(ret.args,quote

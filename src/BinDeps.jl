@@ -3,7 +3,7 @@ __precompile__()
 module BinDeps
 
 using Compat
-using Compat.String
+using Compat: String, KERNEL
 
 export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
         Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -209,7 +209,7 @@ function run(c::Choices)
         end
         while true
             print("Plese select desired method: ")
-            method = @compat Symbol(chomp(readline(STDIN)))
+            method = Symbol(chomp(readline(STDIN)))
             for x in c.choices
                 if(method == x.name)
                     return run(x.step)
@@ -333,7 +333,7 @@ function lower(s::ChangeDirectory,collection)
     end
     collection.cwd = s.dir
 end
-@compat lower(s::Void,collection) = nothing
+lower(s::Void,collection) = nothing
 lower(s::Function,collection) = push!(collection,s)
 lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(mkpath(s.dest))), )
 lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )
