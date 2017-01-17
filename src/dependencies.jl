@@ -884,11 +884,9 @@ macro install(_libmaps...)
                         println(depsfile_buffer)
                         println(depsfile_buffer, "# Load-hooks")
                         println(depsfile_buffer, join(load_hooks,"\n"))
-                        if VERSION < v"0.6.0-dev.1256"
-                            depsfile_content = chomp(takebuf_string(depsfile_buffer))
-                        else
-                            depsfile_content = chomp(String(take!(depsfile_buffer)))
-                        end
+                        # the following interpolation is needed because take! and String are imported from Compat to support older version of Julia
+                        # interpolated functions are real Julia objects and are accessible from everywhere
+                        depsfile_content = chomp($String($take!(depsfile_buffer)))
                         if !isfile(depsfile_location) || readchomp(depsfile_location) != depsfile_content
                             # only overwrite if deps.jl file does not yet exist or content has changed
                             open(depsfile_location, "w") do depsfile
