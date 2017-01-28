@@ -57,7 +57,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(Tuple{DependencyProvider,Dict{Symbol,Any}},0),Array(Tuple{DependencyHelper,Dict{Symbol,Any}},0),Dict{Symbol,Any}(properties),validate)
+    r = LibraryDependency(name, context, Tuple{DependencyProvider,Dict{Symbol,Any}}[], Tuple{DependencyHelper,Dict{Symbol,Any}}[], Dict{Symbol,Any}(properties), validate)
     if group !== nothing
         push!(group.deps,r)
     else
@@ -114,8 +114,8 @@ function available_versions(p::AptGet)
                 vs = l[(1+length("Version: ")):end]
                 push!(vers, vs)
             end
-        elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) != nothing
-            m.captures[2] != nothing ? push!(vers, m.captures[2]) :
+        elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) !== nothing
+            m.captures[2] !== nothing ? push!(vers, m.captures[2]) :
                                        push!(vers, m.captures[4])
         elseif startswith(l, "Versions:")
             lookfor_version = true
@@ -239,7 +239,7 @@ immutable SystemPaths <: DependencyProvider; end
 
 show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
-using URIParser, Compat
+using URIParser
 export URI
 
 type NetworkSource <: Sources
@@ -495,7 +495,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
     # Make sure we keep the defaults first, but also look in the other directories
     providers = unique([reduce(vcat,[getallproviders(dep,p) for p in defaults]);dep.providers])
     for (p,opts) in providers
-        (p != nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
+        (p !== nothing && can_use(typeof(p)) && can_provide(p,opts,dep)) || continue
         paths = AbstractString[]
 
         # Allow user to override installation path
@@ -686,7 +686,7 @@ function viable_providers(deps::LibraryGroup)
             continue
         end
         providers = map(x->typeof(x[1]),dep.providers)
-        if vp == nothing
+        if vp === nothing
             vp = providers
         else
             vp = intersect(vp,providers)
@@ -1013,7 +1013,7 @@ macro load_dependencies(args...)
             end
         end)
     end
-    if arg1 != nothing && !isa(arg1,Function)
+    if arg1 !== nothing && !isa(arg1,Function)
         if !isempty(arg1)
             errrormsg = "The following required libraries were not declared in build.jl:\n"
             for k in (isa(arg1,Vector) ? arg1 : keys(arg1))

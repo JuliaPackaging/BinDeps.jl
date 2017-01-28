@@ -31,7 +31,7 @@ function show(io::IO, deps::LibraryGroup)
     print(io," - Library Group \"$(deps.name)\"")
     all = allf(deps)
     providers = satisfied_providers(deps,all)
-    if providers != nothing && !(isempty(providers))
+    if providers !== nothing && !isempty(providers)
         print(io," (satisfied by ",join(providers,", "),")")
     end
     if !applicable(deps)
