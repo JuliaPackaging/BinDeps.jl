@@ -194,7 +194,7 @@ end
 
 type Choices <: BuildStep
     choices::Vector{Choice}
-    Choices() = new(Array(Choice,0))
+    Choices() = new(Choice[])
     Choices(choices::Vector{Choice}) = new(choices)
 end
 

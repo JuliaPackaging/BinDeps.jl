@@ -57,7 +57,7 @@ function _library_dependency(context::PackageContext, name; properties...)
             group = v
         end
     end
-    r = LibraryDependency(name,context,Array(Tuple{DependencyProvider,Dict{Symbol,Any}},0),Array(Tuple{DependencyHelper,Dict{Symbol,Any}},0),Dict{Symbol,Any}(properties),validate)
+    r = LibraryDependency(name, context, Tuple{DependencyProvider,Dict{Symbol,Any}}[], Tuple{DependencyHelper,Dict{Symbol,Any}}[], Dict{Symbol,Any}(properties), validate)
     if group !== nothing
         push!(group.deps,r)
     else
