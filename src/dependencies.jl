@@ -239,7 +239,7 @@ immutable SystemPaths <: DependencyProvider; end
 
 show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
-using URIParser, Compat
+using URIParser
 export URI
 
 type NetworkSource <: Sources

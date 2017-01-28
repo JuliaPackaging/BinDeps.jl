@@ -303,7 +303,7 @@ dest(b::BuildStep) = b.dest
 
 (|)(a::BuildStep,b::BuildStep) = SynchronousStepCollection()
 function (|)(a::SynchronousStepCollection,b::SynchronousStepCollection)
-	if(a.cwd==b.cwd)
+	if a.cwd == b.cwd
 		append!(a.steps,b.steps)
 	else
 		push!(a.steps,b)
@@ -328,7 +328,7 @@ end
 FileRule{T<:AbstractString}(files::Vector{T},step) = FileRule(AbstractString[f for f in files],step)
 
 function lower(s::ChangeDirectory,collection)
-    if(!isempty(collection.steps))
+    if !isempty(collection.steps)
         error("Change of Directory must be the first instruction")
     end
     collection.cwd = s.dir
@@ -369,10 +369,10 @@ end
 if is_unix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
-        if(!isempty(a.dir))
+        if !isempty(a.dir)
             cmd = `$cmd -C $(a.dir)`
         end
-        if(!isempty(a.targets))
+        if !isempty(a.targets)
             cmd = `$cmd $(a.targets)`
         end
         @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
@@ -448,18 +448,18 @@ function run(f::Function)
 end
 
 function run(s::FileRule)
-    if(!any(map(isfile,s.file)))
+    if !any(map(isfile,s.file))
         run(s.step)
-		if(!any(map(isfile,s.file)))
+		if !any(map(isfile,s.file))
 			error("File $(s.file) was not created successfully (Tried to run $(s.step) )")
 		end
     end
 end
 function run(s::DirectoryRule)
 	info("Attempting to Create directory $(s.dir)")
-    if(!isdir(s.dir))
+    if !isdir(s.dir)
         run(s.step)
-		if(!isdir(s.dir))
+		if !isdir(s.dir)
 			error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
 		end
 	else
@@ -483,12 +483,12 @@ function run(s::BuildStep)
 end
 function run(s::SynchronousStepCollection)
     for x in s.steps
-		if(!isempty(s.cwd))
+		if !isempty(s.cwd)
 			info("Changing Directory to $(s.cwd)")
 			cd(s.cwd)
 		end
         run(x)
-        if(!isempty(s.oldcwd))
+        if !isempty(s.oldcwd)
 			info("Changing Directory to $(s.oldcwd)")
 			cd(s.oldcwd)
 		end
