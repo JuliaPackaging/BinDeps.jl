@@ -3,10 +3,10 @@ import Base: show
 const OSNAME = is_windows() ? :Windows : KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
-abstract DependencyProvider
+@compat abstract type DependencyProvider end
 
 # A library helper may be used by `DependencyProvider`s but will by itself not provide the library
-abstract DependencyHelper
+@compat abstract type DependencyHelper end
 
 type PackageContext
     do_install::Bool
@@ -91,7 +91,7 @@ export library_dependency, bindir, srcdir, usrdir, libdir
 
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@BinDeps.setup`?")
 
-abstract PackageManager <: DependencyProvider
+@compat abstract type PackageManager <: DependencyProvider end
 
 DEBIAN_VERSION_REGEX = r"^
     ([0-9]+\:)?                                           # epoch
@@ -227,8 +227,8 @@ libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
-abstract Sources <: DependencyHelper
-abstract Binaries <: DependencyProvider
+@compat abstract type Sources <: DependencyHelper end
+@compat abstract type Binaries <: DependencyProvider end
 
 #
 # A dummy provider checked for every library that
@@ -261,7 +261,7 @@ end
 
 libdir(p::CustomPathBinaries,dep) = p.path
 
-abstract BuildProcess <: DependencyProvider
+@compat abstract type BuildProcess <: DependencyProvider end
 
 type SimpleBuild <: BuildProcess
     steps

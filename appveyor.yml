@@ -33,4 +33,4 @@ build_script:
       Pkg.clone(pwd(), \"BinDeps\"); Pkg.build(\"BinDeps\")"
 
 test_script:
-  - C:\projects\julia\bin\julia -F -e "Pkg.test(\"BinDeps\")"
+  - C:\projects\julia\bin\julia -e "Pkg.test(\"BinDeps\")"
