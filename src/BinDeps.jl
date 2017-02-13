@@ -43,7 +43,7 @@ macro make_rule(condition,command)
     end
 end
 
-abstract BuildStep
+@compat abstract type BuildStep end
 
 downloadcmd = nothing
 function download_cmd(url::AbstractString, filename::AbstractString)
