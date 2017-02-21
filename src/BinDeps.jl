@@ -91,7 +91,11 @@ if is_unix()
         elseif extension == ".tar"
             return (`tar xf $file --directory=$directory`)
         elseif extension == ".zip"
-            return (`unzip -x $file -d $directory`)
+            @static if is_bsd() && !is_apple()
+                return (`unzip -x $file -d $directory $file`)
+            else
+                return (`unzip -x $file -d $directory`)
+            end
         elseif extension == ".gz"
             return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`)
         end
