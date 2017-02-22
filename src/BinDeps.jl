@@ -80,7 +80,7 @@ function download_cmd(url::AbstractString, filename::AbstractString)
     end
 end
 
-if is_unix()
+if is_unix() && KERNEL != :FreeBSD
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
             return (`tar xzf $file --directory=$directory`)
@@ -91,15 +91,24 @@ if is_unix()
         elseif extension == ".tar"
             return (`tar xf $file --directory=$directory`)
         elseif extension == ".zip"
-            @static if is_bsd() && !is_apple()
-                return (`unzip -x $file -d $directory $file`)
-            else
-                return (`unzip -x $file -d $directory`)
-            end
+            return (`unzip -x $file -d $directory`)
         elseif extension == ".gz"
             return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`)
         end
         error("I don't know how to unpack $file")
+    end
+end
+
+if KERNEL == :FreeBSD
+    # The `tar` on FreeBSD can auto-detect the archive format via libarchive.
+    # The supported format can be found in libarchive-formats(5).
+    # For NetBSD and OpenBSD, libarchive is not available.
+    # For macOS, it does. But the previous unpack function works fine already.
+    function unpack_cmd(file, dir, ext, secondary_ext)
+        tar_args = ["--no-same-owner", "--no-same-permissions"]
+        return pipeline(
+            `/bin/mkdir -p $dir`,
+            `/usr/bin/tar -xf $file -C $dir $tar_args`)
     end
 end
 
