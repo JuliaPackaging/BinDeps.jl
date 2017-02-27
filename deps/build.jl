@@ -1,15 +1,11 @@
 commands = ["apt-get", "pacman", "yum", "zypper"]
+items=""
 try
-    run(pipeline(`which unzip`, stdout=DevNull, stderr=DevNull))
-catch
+    items = readstring((pipeline(`ls /usr/bin`, stderr = DevNull)));
+end
+if ((contains(items,"\nunzip\n") == false) && (items != ""))
     for i in commands
-        path=["",""]
-        try
-            path=split(readstring(pipeline(`which $(i)`, stderr=DevNull)),'/')
-        catch
-            continue
-        end
-        if (path[2]=="usr" && path[3]=="bin")
+        if (contains(items, "\n$(i)\n"))
             println("Installing unzip...")
             try
                 if (i=="pacman")
@@ -20,7 +16,6 @@ catch
             catch
                 println("Unable to install unzip. Please install it manually.")
             end
-            break
         end
     end
 end
