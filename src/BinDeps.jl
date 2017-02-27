@@ -382,6 +382,17 @@ end
 if is_unix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
+
+        if KERNEL == :FreeBSD
+            jobs = readchomp(`make -V MAKE_JOBS_NUMBER`)
+            if isempty(jobs)
+                jobs = readchomp(`sysctl -n hw.ncpu`)
+            end
+            # tons of project written their Makefile in GNU Make only syntax,
+            # but the implementation of `make` on FreeBSD system base is `bmake`
+            cmd = `gmake -j$jobs`
+        end
+
         if !isempty(a.dir)
             cmd = `$cmd -C $(a.dir)`
         end
