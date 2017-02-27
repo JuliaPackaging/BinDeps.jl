@@ -176,7 +176,7 @@ The basic signature of the provides function is
 ```
 
 where `data` is provider-specific (e.g. a string in all of the package manager 
-cases) and `dependency` is the return value from `library dependency. As you saw
+cases) and `dependency` is the return value from `library_dependency`. As you saw
 above multiple definitions may be combined into one function call as such:
 ```julia
 	provides(Provider,{data1=>dep1, data2=>dep2},options...)
@@ -195,7 +195,7 @@ There are also several builtin options. Some of them are:
  * `os = OS_NAME`
 
  	This provider can only satisfy the library dependency on the specified `os`. 
- 	This argument takes has the same syntax as the `os` keyword argument to \
+ 	This argument takes has the same syntax as the `os` keyword argument to 
 	`library_dependency`.
 
  * `installed_libpath = "path"`
