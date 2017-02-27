@@ -1,16 +1,26 @@
-s=""
+commands = ["apt-get", "pacman", "yum", "zypper"]
 try
-    s = s * chomp(readstring(pipeline(`cat /etc/issue`, stderr=DevNull)))
-end
-try
-    s = s* chomp(readstring(pipeline(`cat /proc/version`, stderr=DevNull)))
-end
-try
-    if(contains(lowercase(s), "arch"))
+    run(pipeline(`which unzip`, stdout=DevNull, stderr=DevNull))
+catch
+    for i in commands
+        path=["",""]
         try
-            run(pipeline(`sudo pacman -S unzip`, stdout=DevNull, stderr=DevNull))
+            path=split(readstring(pipeline(`which $(i)`, stderr=DevNull)),'/')
         catch
-            println("Unable to install zip. Please install it manually.")
+            continue
+        end
+        if (path[2]=="usr" && path[3]=="bin")
+            println("Installing unzip...")
+            try
+                if (i=="pacman")
+                    run(pipeline(`sudo $(i) -S unzip`, stderr=DevNull))
+                else
+                    run(pipeline(`sudo $(i) install unzip`, stderr=DevNull))
+                end
+            catch
+                println("Unable to install unzip. Please install it manually.")
+            end
+            break
         end
     end
 end
