@@ -83,21 +83,21 @@ end
 if is_unix()
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
-            return (`tar xzf $file --directory=$directory`)
+            return pipeline(`tar xzf $file --directory=$directory`; stdout=DevNull)
         elseif (extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
-            return (`tar xjf $file --directory=$directory`)
+            return pipeline(`tar xjf $file --directory=$directory`; stdout=DevNull)
         elseif extension == ".xz" && secondary_extension == ".tar"
-            return pipeline(`unxz -c $file `, `tar xv --directory=$directory`)
+            return pipeline(`unxz -c $file `, `tar xv --directory=$directory`; stdout=DevNull)
         elseif extension == ".tar"
-            return (`tar xf $file --directory=$directory`)
+            return pipeline(`tar xf $file --directory=$directory`; stdout=DevNull)
         elseif extension == ".zip"
             @static if is_bsd() && !is_apple()
-                return (`unzip -x $file -d $directory $file`)
+                return pipeline(`unzip -x $file -d $directory $file`; stdout=DevNull)
             else
-                return (`unzip -x $file -d $directory`)
+                return pipeline(`unzip -x $file -d $directory`; stdout=DevNull)
             end
         elseif extension == ".gz"
-            return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`)
+            return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`; stdout=DevNull)
         end
         error("I don't know how to unpack $file")
     end
@@ -107,10 +107,10 @@ if is_windows()
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                 secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
-            return pipeline(`7z x $file -y -so`, `7z x -si -y -ttar -o$directory`)
+            return pipeline(`7z x $file -y -so`, `7z x -si -y -ttar -o$directory`; stdout=DevNull)
         elseif (extension == ".zip" || extension == ".7z" || extension == ".tar" ||
                 (extension == ".exe" && secondary_extension == ".7z"))
-            return (`7z x $file -y -o$directory`)
+            return pipeline(`7z x $file -y -o$directory`; stdout=DevNull)
         end
         error("I don't know how to unpack $file")
     end
@@ -352,14 +352,14 @@ function splittarpath(path)
         base_filename *= secondary_extension
         secondary_extension = ""
     end
-    (base_filename,extension,secondary_extension)
+    (base_filename, extension, secondary_extension)
 end
-function lower(s::FileUnpacker,collection)
+function lower(s::FileUnpacker, collection)
     base_filename,extension,secondary_extension = splittarpath(s.src)
     target = !isempty(s.target) ? s.target : basename(base_filename)
     @dependent_steps begin
-        CreateDirectory(dirname(s.dest),true)
-        PathRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
+        CreateDirectory(dirname(s.dest), true)
+        PathRule(joinpath(s.dest,target), unpack_cmd(s.src, s.dest, extension, secondary_extension))
     end
 end
 
