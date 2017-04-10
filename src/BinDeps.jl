@@ -83,21 +83,21 @@ end
 if is_unix()
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
-            return pipeline(`tar xzf $file --directory=$directory`, stdout=DevNull)
+            return (`tar xzf $file --directory=$directory`)
         elseif (extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
-            return pipeline(`tar xjf $file --directory=$directory`, stdout=DevNull)
+            return (`tar xjf $file --directory=$directory`)
         elseif extension == ".xz" && secondary_extension == ".tar"
             return pipeline(`unxz -c $file `, `tar xv --directory=$directory`)
         elseif extension == ".tar"
-            return pipeline(`tar xf $file --directory=$directory`, stdout=DevNull)
+            return (`tar xf $file --directory=$directory`)
         elseif extension == ".zip"
             @static if is_bsd() && !is_apple()
-                return pipeline(`unzip -x $file -d $directory $file`, stdout=DevNull)
+                return (`unzip -x $file -d $directory $file`)
             else
-                return pipeline(`unzip -x $file -d $directory`; stdout=DevNull)
+                return (`unzip -x $file -d $directory`)
             end
         elseif extension == ".gz"
-            return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`; stdout=DevNull)
+            return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`)
         end
         error("I don't know how to unpack $file")
     end
@@ -110,6 +110,7 @@ if is_windows()
             return pipeline(`7z x $file -y -so`, `7z x -si -y -ttar -o$directory`)
         elseif (extension == ".zip" || extension == ".7z" || extension == ".tar" ||
                 (extension == ".exe" && secondary_extension == ".7z"))
+            # 7z dumps all output to STDOUT, which is annoying so we pipe to DevNull to suppress them
             return pipeline(`7z x $file -y -o$directory`, stdout=DevNull)
         end
         error("I don't know how to unpack $file")
