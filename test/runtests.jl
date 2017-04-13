@@ -11,3 +11,6 @@ using GSL
 
 # PR 171
 @test BinDeps.lower(nothing, nothing) === nothing
+
+# PR 271
+BinDeps.debug("Cairo")

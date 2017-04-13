@@ -58,8 +58,14 @@ end
 function debug(io,pkg::AbstractString)
     context = debug_context(pkg)
     println(io,"The package declares $(length(context.deps)) dependencies.")
-    for dep in context.deps
-        show(io,dep)
+    
+    # We need to `eval()` the rest of this function because `debug_context()` will
+    # `eval()` in things like `Homebrew.jl`, which contain new methods for things
+    # like `can_provide()`, and we cannot deal with those new methods in our
+    # current world age; we need to `eval()` to force ourselves up into a newer
+    # world age.
+    @eval for dep in $(context.deps)
+        show($io,dep)
     end
 end
 debug(pkg::AbstractString) = debug(STDOUT,pkg)
