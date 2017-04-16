@@ -110,7 +110,8 @@ if is_windows()
             return pipeline(`7z x $file -y -so`, `7z x -si -y -ttar -o$directory`)
         elseif (extension == ".zip" || extension == ".7z" || extension == ".tar" ||
                 (extension == ".exe" && secondary_extension == ".7z"))
-            return (`7z x $file -y -o$directory`)
+            # 7z dumps all output to STDOUT, which is annoying so we pipe to DevNull to suppress them
+            return pipeline(`7z x $file -y -o$directory`, stdout=DevNull)
         end
         error("I don't know how to unpack $file")
     end
@@ -352,14 +353,14 @@ function splittarpath(path)
         base_filename *= secondary_extension
         secondary_extension = ""
     end
-    (base_filename,extension,secondary_extension)
+    (base_filename, extension, secondary_extension)
 end
-function lower(s::FileUnpacker,collection)
+function lower(s::FileUnpacker, collection)
     base_filename,extension,secondary_extension = splittarpath(s.src)
     target = !isempty(s.target) ? s.target : basename(base_filename)
     @dependent_steps begin
-        CreateDirectory(dirname(s.dest),true)
-        PathRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
+        CreateDirectory(dirname(s.dest), true)
+        PathRule(joinpath(s.dest,target), unpack_cmd(s.src, s.dest, extension, secondary_extension))
     end
 end
 
