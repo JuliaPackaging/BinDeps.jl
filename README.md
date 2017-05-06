@@ -258,7 +258,7 @@ To load dependencies without a runtime dependence on BinDeps, place code like th
 near the start of the Package's primary file. Don't forget to change the error message to 
 reflect the name of the package.
 ```julia
-const depsfile = joinpath(dirname(@__FILE__),"..", "deps", "deps.jl")
+const depsfile = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 if isfile(depsfile)
     include(depsfile)
 else
@@ -268,11 +268,11 @@ end
 
 This will make all your libraries available as variables named by the names you gave the 
 dependency. E.g. if you declared a dependency as
-  ```julia
- 	library_dependency("libfoo")
- ```
- The `libfoo` variable will now contain a reference to that library that may be passed
- to `ccall` or similar functions. 
+```julia
+library_dependency("libfoo")
+```
+The `libfoo` variable will now contain a reference to that library that may be passed
+to `ccall` or similar functions. 
 
 # The low level interface
 	
