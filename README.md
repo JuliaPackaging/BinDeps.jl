@@ -254,7 +254,9 @@ provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"),libv
 
 # The high level interface - Loading dependencies
 
-To load dependencies without a runtime dependence on BinDeps, place code like the following near the start of the module's primary file. Don't forget to change the error message to reflect the name of your package.
+To load dependencies without a runtime dependence on BinDeps, place code like the following
+near the start of the Package's primary file. Don't forget to change the error message to 
+reflect the name of the package.
 ```julia
 const depsfile = joinpath(dirname(@__FILE__), "deps", "deps.jl")
 if isfile(depsfile)
@@ -263,6 +265,14 @@ else
     error("HDF5 not properly installed. Please run Pkg.build(\"HDF5\")")
 end
 ```
+
+This will make all your libraries available as variables named by the names you gave the 
+dependency. E.g. if you declared a dependency as
+  ```julia
+ 	library_dependency("libfoo")
+ ```
+ The `libfoo` variable will now contain a reference to that library that may be passed
+ to `ccall` or similar functions. 
 
 # The low level interface
 	
