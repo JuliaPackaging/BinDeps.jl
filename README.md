@@ -258,7 +258,7 @@ To load dependencies without a runtime dependence on BinDeps, place code like th
 near the start of the Package's primary file. Don't forget to change the error message to 
 reflect the name of the package.
 ```julia
-const depsfile = joinpath(dirname(@__FILE__), "deps", "deps.jl")
+const depsfile = joinpath(dirname(@__FILE__),"..", "deps", "deps.jl")
 if isfile(depsfile)
     include(depsfile)
 else
