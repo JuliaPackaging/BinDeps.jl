@@ -316,12 +316,12 @@ which will assign the result to the `_foo` and `_bar` variables instead.
 ```
 
 
-    All the steps are executed synchronously. The result of the `@build_steps` macro 
-    may be passed to run to execute it directly, thought this is not recommended other
-    than for debugging purposes. Instead, please use the high level interface to tie 
-    the build process to dependencies. 
+All the steps are executed synchronously. The result of the `@build_steps` macro 
+may be passed to run to execute it directly, thought this is not recommended other
+than for debugging purposes. Instead, please use the high level interface to tie 
+the build process to dependencies. 
 
-    Some of the builtin build steps are:
+Some of the builtin build steps are:
 
   * FileDownloader(remote_file,local_file)
 
