@@ -3,15 +3,13 @@ __precompile__()
 module BinDeps
 
 using Compat
-using Compat: String, KERNEL
 
 export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
-        Choice, Choices, CCompile, FileDownloader, FileRule,
-        ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
-        autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
+    Choice, Choices, CCompile, FileDownloader, FileRule,
+    ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
+    autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
-const dlext = Libdl.dlext
-const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
+const shlib_ext = Libdl.dlext # compatibility with older packages (e.g. ZMQ)
 
 function find_library(pkg,libname,files)
     Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
