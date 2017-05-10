@@ -9,8 +9,6 @@ export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
     autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
-const shlib_ext = Libdl.dlext # compatibility with older packages (e.g. ZMQ)
-
 function find_library(pkg,libname,files)
     Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
     dl = C_NULL
@@ -528,4 +526,10 @@ autotools_install(args...) = error("autotools_install has been removed")
 include("dependencies.jl")
 include("debug.jl")
 include("show.jl")
+
+
+# deprecations
+
+@Base.deprecate_binding shlib_ext Libdl.dlext
+
 end
