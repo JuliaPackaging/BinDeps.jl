@@ -1,6 +1,6 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 import Base: show
-const OSNAME = is_windows() ? :Windows : KERNEL
+const OSNAME = is_windows() ? :Windows : Sys.KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
 @compat abstract type DependencyProvider end
@@ -440,7 +440,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:installed_libpath] = String[joinpath(libdir(dep),opts[:installed_libname])]
         delete!(opts, :installed_libname)
     elseif !haskey(opts,:installed_libpath)
-        opts[:installed_libpath] = String[joinpath(libdir(dep),x)*"."*dlext for x in stringarray(get(dep.properties,:aliases,String[]))]
+        opts[:installed_libpath] = String[joinpath(libdir(dep),x)*"."*Libdl.dlext for x in stringarray(get(dep.properties,:aliases,String[]))]
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
         opts[:libtarget] = String[x*"."*dlext for x in stringarray(dep.properties[:aliases])]

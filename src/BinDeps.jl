@@ -3,15 +3,11 @@ __precompile__()
 module BinDeps
 
 using Compat
-using Compat: String, KERNEL
 
 export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
-        Choice, Choices, CCompile, FileDownloader, FileRule,
-        ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
-        autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
-
-const dlext = Libdl.dlext
-const shlib_ext = dlext # compatibility with older packages (e.g. ZMQ)
+    Choice, Choices, CCompile, FileDownloader, FileRule,
+    ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
+    autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
 
 function find_library(pkg,libname,files)
     Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
@@ -530,4 +526,10 @@ autotools_install(args...) = error("autotools_install has been removed")
 include("dependencies.jl")
 include("debug.jl")
 include("show.jl")
+
+
+# deprecations
+
+@Base.deprecate_binding shlib_ext Libdl.dlext
+
 end
