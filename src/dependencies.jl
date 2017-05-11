@@ -1043,13 +1043,8 @@ using SHA
 function sha_check(path, sha)
     open(path) do f
         calc_sha = sha256(f)
-	# Workaround for SHA.jl API change.  Safe to remove once SHA versions
-	# < v0.2.0 are rare, e.g. when Julia v0.4 is deprecated.
-        if !isa(calc_sha, AbstractString)
-            calc_sha = bytes2hex(calc_sha)
-        end
         if calc_sha != sha
-            error("Checksum mismatch!  Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again")
+            error("Checksum mismatch! Expected:\n$sha\nCalculated:\n$calc_sha\nDelete $path and try again.")
         end
     end
 end
