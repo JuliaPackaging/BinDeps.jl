@@ -117,7 +117,7 @@ There are a couple of other keyword arguments that are currently implemented:
 gettext = library_dependency("gettext", aliases = ["libgettext", "libgettextlib"], os = :Unix)
 ```
 
- * `depends = [dep1,dep2]`
+ * `depends = [dep1, dep2]`
 	Currently unused, but in the future will be used to keep track of the dependency graph between binary dependencies to allow parallel builds. E.g.:
 
 ```julia
@@ -160,12 +160,9 @@ in apt-get and that both libraries are installed by the `baz` or the `baz1` yum 
 declare this as follows:
 
 ```julia
-provides(AptGet,{
-    "libfoo-dev" => foo,
-    "libbaz-dev" => baz,
-})
-provides(Yum,["baz","baz1"],[foo,baz])
-provides(Pacman,"baz",[foo,baz])
+provides(AptGet, Dict("libfoo-dev" => foo, "libbaz-dev" => baz))
+provides(Yum, ["baz", "baz1"], [foo, baz])
+provides(Pacman, "baz", [foo, baz])
 ```
 
 One may remember the `provides` function by thinking `AptGet` `provides` the dependencies `foo` and `baz`. 
@@ -179,7 +176,7 @@ where `data` is provider-specific (e.g. a string in all of the package manager
 cases) and `dependency` is the return value from `library_dependency`. As you saw
 above multiple definitions may be combined into one function call as such:
 ```julia
-	provides(Provider,{data1=>dep1, data2=>dep2},options...)
+provides(Provider, Dict(data1=>dep1, data2=>dep2), options...)
 ```
 which is equivalent to (and in fact will be internally dispatched) to:
 ```julia
@@ -221,7 +218,7 @@ We have already seen the `AptGet`, and `Yum` providers, which all take a string 
  	you may use the :unpacked_dir option to specify the name of the unpacked directory,
  	e.g.
 
-```
+```julia
 provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"), libvirt,
     unpacked_dir = "libvirt-1.1.1")
 ```
