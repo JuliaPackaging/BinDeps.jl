@@ -189,7 +189,7 @@ also be an array of dependencies (as in the `Yum` and `Pacman` cases above).
 
 There are also several builtin options. Some of them are:
 
- - `os = OS_NAME`
+ - `os = OS_NAME # e.g. :Linux, :Windows, :Darwin`
 
     This provider can only satisfy the library dependency on the specified `os`. 
     This argument takes has the same syntax as the `os` keyword argument to 
@@ -206,7 +206,8 @@ There are also several builtin options. Some of them are:
 
 # The high level interface - built in providers
 
-We have already seen the `AptGet`, and `Yum` providers, which all take a string naming the package as their data argument. The other build-in providers are:
+We have already seen the `AptGet` and `Yum` providers, which all take a string naming the package as
+their data argument. The other build-in providers are:
 
  - Sources
 
