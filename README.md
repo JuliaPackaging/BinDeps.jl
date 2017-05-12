@@ -31,7 +31,7 @@ the actual package, I want to answer a few common questions:
     one can imagine:
 
 ```julia
-    run(`make`)
+run(`make`)
 ```
 
   * I want to use BinDeps, but it is missing some functionality I need  
@@ -59,22 +59,22 @@ the actual package, I want to answer a few common questions:
     the specified directory structure is:
 
 ```
-	deps/
-		build.jl 		# This is your build file
-		downloads/  	# Store any binary/source downloads here
-		builds/		
-			dep1/		# out-of-tree build for dep1, is possible
-			dep2/   	# out-of-tree build for dep2, is possible
-		    ...
-		src/		
-			dep1/   	# Source code for dep1
-			dep2/		# Source code for dep2
-			...
-		usr/			# "prefix", install your binaries here
-			lib/		# Dynamic libraries (yes even on Windows)
-			bin/		# Excecutables
-			include/	# Headers
-			...
+deps/
+    build.jl        # This is your build file
+    downloads/      # Store any binary/source downloads here
+    builds/ 
+        dep1/       # out-of-tree build for dep1, is possible
+        dep2/       # out-of-tree build for dep2, is possible
+        ...
+    src/        
+        dep1/       # Source code for dep1
+        dep2/       # Source code for dep2
+        ...
+    usr/            # "prefix", install your binaries here
+        lib/        # Dynamic libraries (yes even on Windows)
+        bin/        # Excecutables
+        include/    # Headers
+        ...
 ```
 
 # The high level interface - Declaring dependencies
@@ -91,7 +91,7 @@ Every one of these library dependencies is introduced by the `library_dependency
 is the name of the library, so the following would be an entirely valid call:
 
 ```julia
-	foo = library_dependency("libfoo")
+foo = library_dependency("libfoo")
 ```
 
 However, you'll most likely quickly run into the issue that this library is named differently on different systems, which is 
@@ -100,7 +100,7 @@ other times as `libfoo-1.so` or `libfoo-1.0.0.dylib` or even `libbar.dll` on win
 decided to punish windows users. In either case, we can easily declare all these in our library dependency:
 
 ```julia
-	foo = library_dependency("libfoo",aliases=["libfoo","libfoo-1","libfoo-1.0.0","libbar"])
+foo = library_dependency("libfoo", aliases = ["libfoo", "libfoo-1", "libfoo-1.0.0", "libbar"])
 ```
 
 So far so good!
@@ -114,14 +114,14 @@ There are a couple of other keyword arguments that are currently implemented:
  	As an example, consider this line from the Cairo build script:
 
 ```julia
-	gettext = library_dependency("gettext", aliases = ["libgettext", "libgettextlib"], os = :Unix)
+gettext = library_dependency("gettext", aliases = ["libgettext", "libgettextlib"], os = :Unix)
 ```
 
  * `depends = [dep1,dep2]`
 	Currently unused, but in the future will be used to keep track of the dependency graph between binary dependencies to allow parallel builds. E.g.:
 
 ```julia
-	cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], depends = [gobject,fontconfig,libpng])
+cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], depends = [gobject, fontconfig, libpng])
 ```
 
  * `runtime::Bool`
@@ -151,8 +151,8 @@ to do so is to use the system package manger. So suppose we have
 defined the following dependencies:
 
 ```julia
-	foo = library_dependency("libfoo")
-	baz = library_dependency("libbaz")
+foo = library_dependency("libfoo")
+baz = library_dependency("libbaz")
 ```
 
 Let's suppose that these libraries are available in the `libfoo-dev` and `libbaz-dev`
@@ -160,19 +160,19 @@ in apt-get and that both libraries are installed by the `baz` or the `baz1` yum 
 declare this as follows:
 
 ```julia
-	provides(AptGet,{
-		"libfoo-dev" => foo,
-		"libbaz-dev" => baz,
-	})
-	provides(Yum,["baz","baz1"],[foo,baz])
-	provides(Pacman,"baz",[foo,baz])
+provides(AptGet,{
+    "libfoo-dev" => foo,
+    "libbaz-dev" => baz,
+})
+provides(Yum,["baz","baz1"],[foo,baz])
+provides(Pacman,"baz",[foo,baz])
 ```
 
 One may remember the `provides` function by thinking `AptGet` `provides` the dependencies `foo` and `baz`. 
 
 The basic signature of the provides function is
 ```julia
-	provides(Provider, data, dependency, options...)
+provides(Provider, data, dependency, options...)
 ```
 
 where `data` is provider-specific (e.g. a string in all of the package manager 
@@ -183,8 +183,8 @@ above multiple definitions may be combined into one function call as such:
 ```
 which is equivalent to (and in fact will be internally dispatched) to:
 ```julia
-	provides(Provider,data1,dep1,options...)
-	provides(Provider,data2,dep2,options...)
+provides(Provider, data1, dep1, options...)
+provides(Provider, data2, dep2, options...)
 ```
 
 If one provide satisfied multiple dependencies simultaneously, `dependency` may 
@@ -222,8 +222,8 @@ We have already seen the `AptGet`, and `Yum` providers, which all take a string 
  	e.g.
 
 ```
-provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"),libvirt,
-		unpacked_dir="libvirt-1.1.1")
+provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"), libvirt,
+    unpacked_dir = "libvirt-1.1.1")
 ```
 
 
@@ -240,7 +240,7 @@ provides(Sources,URI("http://libvirt.org/sources/libvirt-1.1.1-rc2.tar.gz"),libv
  	Common super class of various kind of build processes. The exact behavior depends on the `data` argument. Some of the currently supported build processes are:
 
 ```julia
- 	Autotools(;options...)
+Autotools(; options...)
 ```
  	
  	Download the sources (as declared by the "Sources" provider) and attempt to 
@@ -260,7 +260,7 @@ file.
 
 The basic usage is very simple:
 
-```jl
+```julia
 using BinDeps
 @BinDeps.load_dependencies
 ```
@@ -269,7 +269,7 @@ This will make all your libraries available as variables named by the names you 
 the dependency. E.g. if you declared a dependency as
 
 ```julia
-	library_dependency("libfoo")
+library_dependency("libfoo")
 ```
 
 The `libfoo` variable will now contain a reference to that library that may be passed
@@ -295,24 +295,24 @@ which will assign the result to the `_foo` and `_bar` variables instead.
    The low level interface provides a number of utilities to write cross platform 
    build scripts. It looks something like this (from the Cairo build script):
 
-```jl
-	@build_steps begin
-		GetSources(libpng)
-		CreateDirectory(pngbuilddir)
-		@build_steps begin
-			ChangeDirectory(pngbuilddir)
-			FileRule(joinpath(prefix,"lib","libpng15.dll"),@build_steps begin
-				`cmake -DCMAKE_INSTALL_PREFIX="$prefix" -G"MSYS Makefiles" $pngsrcdir`
-				`make`
-				`cp libpng*.dll $prefix/lib`
-				`cp libpng*.a $prefix/lib`
-				`cp libpng*.pc $prefix/lib/pkgconfig`
-				`cp pnglibconf.h $prefix/include`
-				`cp $pngsrcdir/png.h $prefix/include`
-				`cp $pngsrcdir/pngconf.h $prefix/include`
-			end)
-		end
-	end
+```julia
+@build_steps begin
+    GetSources(libpng)
+    CreateDirectory(pngbuilddir)
+    @build_steps begin
+        ChangeDirectory(pngbuilddir)
+        FileRule(joinpath(prefix,"lib","libpng15.dll"),@build_steps begin
+            `cmake -DCMAKE_INSTALL_PREFIX="$prefix" -G"MSYS Makefiles" $pngsrcdir`
+            `make`
+            `cp libpng*.dll $prefix/lib`
+            `cp libpng*.a $prefix/lib`
+            `cp libpng*.pc $prefix/lib/pkgconfig`
+            `cp pnglibconf.h $prefix/include`
+            `cp $pngsrcdir/png.h $prefix/include`
+            `cp $pngsrcdir/pngconf.h $prefix/include`
+        end)
+    end
+end
 ```
 
 
@@ -368,7 +368,7 @@ Some of the builtin build steps are:
 A simple way to see what libraries are required by a package, and to detect missing dependencies,
 is to use `BinDeps.debug("PackageName")`:
 
-```
+```julia
 julia> using BinDeps
 
 julia> BinDeps.debug("Cairo")
@@ -386,5 +386,4 @@ The package declares 1 dependencies.
           - BinDeps.AptGet package gettext (can't provide)
           - BinDeps.Yum package gettext-libs (can't provide)
           - Autotools Build
-...
 ```
