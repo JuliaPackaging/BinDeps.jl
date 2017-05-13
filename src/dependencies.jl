@@ -484,10 +484,8 @@ end
 
 const EXTENSIONS = ["", "." * Libdl.dlext]
 
-#
 # Finds all copies of the library on the system, listed in preference order.
 # Return value is an array of tuples of the provider and the path where it is found
-#
 function _find_library(dep::LibraryDependency; provider = Any)
     ret = Any[]
     # Same as find_library, but with extra check defined by dep
@@ -556,31 +554,16 @@ function _find_library(dep::LibraryDependency; provider = Any)
     return ret
 end
 
-if VERSION < v"0.5.0-dev+1022"
-    function check_path!(ret,dep,opath)
-        flags = Libdl.RTLD_LAZY
-        handle = Libc.malloc(2*sizeof(Ptr{Void}))
-        err = ccall(:jl_uv_dlopen,Cint,(Ptr{UInt8},Ptr{Void},Cuint),opath,handle,flags)
-        if err == 0
-            check_system_handle!(ret,dep,handle)
-            Libdl.dlclose(handle)
-            # in Julia 0.4 handle is freed by dlclose.
-            if VERSION < v"0.4-"
-                c_free(handle)
-            end
-        end
-    end
-else
-    function check_path!(ret, dep, opath)
-        flags = Libdl.RTLD_LAZY
-        handle = ccall(:jl_dlopen, Ptr{Void}, (Cstring, Cuint), opath, flags)
-        try
-            check_system_handle!(ret, dep, handle)
-        finally
-            handle != C_NULL && Libdl.dlclose(handle)
-        end
+function check_path!(ret, dep, opath)
+    flags = Libdl.RTLD_LAZY
+    handle = ccall(:jl_dlopen, Ptr{Void}, (Cstring, Cuint), opath, flags)
+    try
+        check_system_handle!(ret, dep, handle)
+    finally
+        handle != C_NULL && Libdl.dlclose(handle)
     end
 end
+
 
 function check_system_handle!(ret,dep,handle)
     if handle != C_NULL
