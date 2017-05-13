@@ -255,41 +255,25 @@ Autotools(; options...)
 
 # The high level interface - Loading dependencies
 
-BinDeps provides the `@BinDeps.load_dependencies` macro that you may call early in 
-initialization process of your package to load all declared libraries in your build.jl
-file. 
-
-The basic usage is very simple:
-
+To load dependencies without a runtime dependence on BinDeps, place code like the following
+near the start of the Package's primary file. Don't forget to change the error message to 
+reflect the name of the package.
 ```julia
-using BinDeps
-@BinDeps.load_dependencies
+const depsfile = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
+if isfile(depsfile)
+    include(depsfile)
+else
+    error("HDF5 not properly installed. Please run Pkg.build(\"HDF5\") then restart Julia.")
+end
 ```
 
-This will make all your libraries available as variables named by the names you gave 
-the dependency. E.g. if you declared a dependency as
-
+This will make all your libraries available as variables named by the names you gave the 
+dependency. E.g. if you declared a dependency as
 ```julia
 library_dependency("libfoo")
 ```
-
 The `libfoo` variable will now contain a reference to that library that may be passed
 to `ccall` or similar functions. 
-
-If you only want to load a subset of the declared dependencies you may pass the macro
-a list of libraries to load, e.g. 
-```julia
-@BinDeps.load_dependencies [:libfoo, :libbar]
-```
-
-if you do not want to change the names of the variables that these libraries get 
-stored in, you may use
-
-```julia
-@BinDeps.load_dependencies [:libfoo=>:_foo, :libbar=>:_bar]
-```
-
-which will assign the result to the `_foo` and `_bar` variables instead. 
 
 # The low level interface
     
