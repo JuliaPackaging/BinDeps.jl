@@ -29,6 +29,41 @@ type LibraryGroup
     deps::Vector{LibraryDependency}
 end
 
+# List of allowed BinDeps provider keyword options
+const provider_kwopts = [
+    :force_rebuild,
+    :force_depends,
+    :filename,
+    :sha,
+
+    # Build configuration
+    :libtarget,
+    :installed_libname,
+    :installed_libpath,
+    :include_dirs,
+    :lib_dirs,
+    :pkg_config_dirs,
+    :rpath_dirs,
+    :configure_subdir,
+    :unpacked_dir,
+
+    # Build environment
+    :env,
+    :os,
+
+    # Hooks
+    :preload,
+    :onload,
+    :validate,
+]
+
+# Deprecated provider options.  If name is changing, map to the new name
+#   Example:  :SHA should now be :sha, so provide a mapping to the new name
+# If an option is being removed, map to nothing
+const deprecated_provider_kwopts = [
+    :SHA => :sha
+]
+
 # Default directory organization
 pkgdir(dep) = dep.context.dir
 depsdir(dep) = joinpath(pkgdir(dep),"deps")
@@ -365,7 +400,7 @@ function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     @build_steps begin
         FileDownloader(string(h.uri),localfile)
-        ChecksumValidator(get(opts,:SHA,get(opts,:sha,"")),localfile)
+        ChecksumValidator(get(opts,:sha,""),localfile)
         CreateDirectory(srcdir(dep))
         FileUnpacker(localfile,srcdir(dep),srcdir(dep,h,opts))
     end
@@ -375,7 +410,7 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     steps = @build_steps begin
         FileDownloader(string(h.uri),localfile)
-        ChecksumValidator(get(opts,:SHA,get(opts,:sha,"")),localfile)
+        ChecksumValidator(get(opts,:sha,""),localfile)
         FileUnpacker(localfile,depsdir(dep),get(opts,:unpacked_dir,"usr"))
     end
 end
@@ -695,6 +730,28 @@ function viable_providers(deps::LibraryGroup)
     vp
 end
 
+function validate_provider_opts(opts)
+    for (name, value) in opts
+        if name in keys(deprecated_provider_kwopts)
+            new_name = deprecated_provider_kwopts[name]
+            delete!(opts, name)
+            if new_name === nothing
+                warn("Deprecated provider option $name, please report this to the package maintainers")
+            else
+                warn("Deprecated provider option $name (should be $new_name), please report this to the package maintainers")
+                opts[new_name] = value
+            end
+        end
+    end
+    for (name, value) in opts
+        if !(name in provider_kwopts)
+            error("Invalid provider option $name, please report this to the package maintainers")
+        end
+    end
+    return nothing
+end
+
+
 #
 # We need to make sure all libraries are satisfied with the
 # additional constraint that all of them are satisfied by the
@@ -794,6 +851,7 @@ function satisfy!(dep::LibraryDependency, methods = defaults)
     for method in methods
         for (p,opts) in getallproviders(dep,method)
             can_provide(p,opts,dep) || continue
+            validate_provider_opts(opts)
             if haskey(opts,:force_depends)
                 for (dmethod,ddep) in opts[:force_depends]
                     (dp,dopts) = getallproviders(ddep,dmethod)[1]
