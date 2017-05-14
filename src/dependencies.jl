@@ -374,7 +374,7 @@ function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
     # choose the destination to unpack into and the folder/file to validate
-    (dest, target) = if :unpacked_dir in keys(opts)
+    (dest, target) = if haskey(opts, :unpacked_dir)
         if opts[:unpacked_dir] == "."
             # if the archive dumps right in the root dir, create a subdir
             (joinpath(depsdir(dep), dep.name), ".")
