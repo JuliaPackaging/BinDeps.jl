@@ -101,7 +101,7 @@ end
 
 if is_windows()
     const exe7z = joinpath(JULIA_HOME, "7z.exe")
-	
+
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                 secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
@@ -354,7 +354,6 @@ function splittarpath(path)
 end
 function lower(s::FileUnpacker,collection)
     base_filename,extension,secondary_extension = splittarpath(s.src)
-    # target = !isempty(s.target) ? s.target : basename(base_filename)
     target = if isempty(s.target)
         basename(base_filename)
     elseif s.target == "."
