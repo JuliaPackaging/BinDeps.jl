@@ -101,7 +101,7 @@ end
 
 if is_windows()
     const exe7z = joinpath(JULIA_HOME, "7z.exe")
-	
+
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                 secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
@@ -151,8 +151,8 @@ type ChecksumValidator <: BuildStep
 end
 
 type FileUnpacker <: BuildStep
-    src::AbstractString     #file
-    dest::AbstractString    #directory
+    src::AbstractString     # archive file
+    dest::AbstractString    # directory to unpack into
     target::AbstractString  #file or directory inside the archive to test
                     #for existence (or blank to check for a.tgz => a/)
 end
@@ -354,7 +354,13 @@ function splittarpath(path)
 end
 function lower(s::FileUnpacker,collection)
     base_filename,extension,secondary_extension = splittarpath(s.src)
-    target = !isempty(s.target) ? s.target : basename(base_filename)
+    target = if isempty(s.target)
+        basename(base_filename)
+    elseif s.target == "."
+        ""
+    else
+        s.target
+    end
     @dependent_steps begin
         CreateDirectory(dirname(s.dest),true)
         PathRule(joinpath(s.dest,target),unpack_cmd(s.src,s.dest,extension,secondary_extension))
@@ -435,7 +441,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if is_windows() 
+    @static if is_windows()
         @dependent_steps begin
             ChangeDirectory(s.src)
             FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))

@@ -373,10 +373,21 @@ end
 function generate_steps(dep::LibraryDependency,h::RemoteBinaries,opts)
     get(opts,:force_rebuild,false) && error("Force rebuild not allowed for binaries. Use a different download location instead.")
     localfile = joinpath(downloadsdir(dep),get(opts,:filename,basename(h.uri.path)))
+    # choose the destination to unpack into and the folder/file to validate
+    (dest, target) = if haskey(opts, :unpacked_dir)
+        if opts[:unpacked_dir] == "."
+            # if the archive dumps right in the root dir, create a subdir
+            (joinpath(depsdir(dep), dep.name), ".")
+        else
+            (depsdir(dep), opts[:unpacked_dir])
+        end
+    else
+        (depsdir(dep), "usr")
+    end
     steps = @build_steps begin
         FileDownloader(string(h.uri),localfile)
         ChecksumValidator(get(opts,:SHA,get(opts,:sha,"")),localfile)
-        FileUnpacker(localfile,depsdir(dep),get(opts,:unpacked_dir,"usr"))
+        FileUnpacker(localfile,dest,target)
     end
 end
 generate_steps(dep::LibraryDependency,h::SimpleBuild,opts) = h.steps
@@ -506,8 +517,14 @@ function _find_library(dep::LibraryDependency; provider = Any)
         ppaths = libdir(p,dep)
         append!(paths,isa(ppaths,Array) ? ppaths : [ppaths])
 
-        if haskey(opts,:unpacked_dir) && isdir(joinpath(depsdir(dep),opts[:unpacked_dir]))
-            push!(paths,joinpath(depsdir(dep),opts[:unpacked_dir]))
+        if haskey(opts,:unpacked_dir)
+            dir = opts[:unpacked_dir]
+            if dir == "." && isdir(joinpath(depsdir(dep), dep.name))
+                # the archive unpacks into the root, so we created a subdir with the dep name
+                push!(paths, joinpath(depsdir(dep), dep.name))
+            elseif isdir(joinpath(depsdir(dep),dir))
+                push!(paths,joinpath(depsdir(dep),dir))
+            end
         end
 
         # Windows, do you know what `lib` stands for???
