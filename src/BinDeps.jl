@@ -76,7 +76,7 @@ function download_cmd(url::AbstractString, filename::AbstractString)
     end
 end
 
-if is_unix() && KERNEL != :FreeBSD
+if is_unix() && Sys.KERNEL != :FreeBSD
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
             return (`tar xzf $file --directory=$directory`)
@@ -95,7 +95,7 @@ if is_unix() && KERNEL != :FreeBSD
     end
 end
 
-if KERNEL == :FreeBSD
+if Sys.KERNEL == :FreeBSD
     # The `tar` on FreeBSD can auto-detect the archive format via libarchive.
     # The supported format can be found in libarchive-formats(5).
     # For NetBSD and OpenBSD, libarchive is not available.
@@ -387,7 +387,7 @@ if is_unix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
 
-        if KERNEL == :FreeBSD
+        if Sys.KERNEL == :FreeBSD
             jobs = readchomp(`make -V MAKE_JOBS_NUMBER`)
             if isempty(jobs)
                 jobs = readchomp(`sysctl -n hw.ncpu`)
