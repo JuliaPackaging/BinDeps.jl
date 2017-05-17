@@ -136,9 +136,7 @@ cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], depend
     (name,handle) as an argument and returns `true` if the library is usable and `false` 
     it not. The `name` argument is either an absolute path or the library name if it is a
     global system library, while the handle is a handle that may be passed to `dlsym` to 
-    check library symbols or the return value of function. Note however that it 
-    is invalid to store the `handle`. Instead, use the `@load_dependencies` macro
-    (see below).
+    check library symbols or the return value of a function. 
     Should the validation return false for a library that was installed by a provider, the 
     provider will be instructed to force a rebuild.
 
