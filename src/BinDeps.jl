@@ -7,7 +7,8 @@ using Compat
 export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
     ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
-    autotools_install, CreateDirectory, MakeTargets, SystemLibInstall
+    autotools_install, CreateDirectory, MakeTargets, SystemLibInstall,
+    MAKE_CMD
 
 function find_library(pkg,libname,files)
     Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
@@ -523,8 +524,7 @@ function run(s::SynchronousStepCollection)
     end
 end
 
-is_unix() && (make_command = `make -j8`)
-is_windows() && (make_command = `make`)
+const MAKE_CMD = is_bsd() && !is_apple() ? `gmake` : `make`
 
 function prepare_src(depsdir,url, downloaded_file, directory_name)
     local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
