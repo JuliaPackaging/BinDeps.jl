@@ -224,6 +224,48 @@ pkg_name(z::Zypper) = z.package
 
 libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
 
+# pkg is the system binary package manager for FreeBSD
+const has_bsdpkg = try success(`pkg -v`) catch e false end
+type BSDPkg <: PackageManager
+    package::AbstractString
+end
+can_use(::Type{BSDPkg}) = has_bsdpkg && Sys.KERNEL === :FreeBSD
+function package_available(p::BSDPkg)
+    can_use(BSDPkg) || return false
+    rgx = Regex(string("^(", p.package, ")(\\s+.+)?\$"))
+    for line in eachline(`pkg search -L name $(p.package)`)
+        ismatch(rgx, line) && return true
+    end
+    return false
+end
+function available_version(p::BSDPkg)
+    looknext = false
+    for line in eachline(`pkg search -L name -Q version $(p.package)`)
+        if rstrip(line) == p.package
+            looknext = true
+            continue
+        end
+        if looknext && startswith(line, "Version")
+            # Package versioning is [SOFTWARE VERSION]_[PORT REVISION],[PORT EPOCH]
+            # In our case we only care about the software version, not the port revision
+            # or epoch. The software version should be recognizable as semver-ish.
+            rawversion = chomp(line[findfirst(c->c==':', line)+2:end])
+            # Chop off the port revision and epoch by removing everything after and
+            # including the first underscore
+            libversion = replace(rawversion, r"_.+$", "")
+            # This should be a valid version, but it's still possible that it isn't
+            if ismatch(Base.VERSION_REGEX, libversion)
+                return VersionNumber(libversion)
+            else
+                error("\"$rawversion\" is not recognized as a version. Please report this to BinDeps.jl.")
+            end
+        end
+    end
+    error("pkg did not return version information. This should not happen. Please file a bug!")
+end
+pkg_name(p::BSDPkg) = p.package
+libdir(p::BSDPkg, dep) = ["/usr/local/lib"]
+
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
@@ -280,7 +322,8 @@ lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelpe
 
 Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}(opts))
 
-export AptGet, Yum, Pacman, Zypper, Sources, Binaries, provides, BuildProcess, Autotools, GetSources, SimpleBuild, available_version
+export AptGet, Yum, Pacman, Zypper, BSDPkg, Sources, Binaries, provides, BuildProcess, Autotools,
+       GetSources, SimpleBuild, available_version
 
 provider{T<:PackageManager}(::Type{T},package::AbstractString; opts...) = T(package)
 provider(::Type{Sources},uri::URI; opts...) = NetworkSource(uri)
@@ -359,6 +402,17 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
         println("Installing dependency $(h.package) via `sudo zypper install $(h.package)`:")
         `sudo zypper install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
+    end
+end
+function generate_steps(dep::LibraryDependency, p::BSDPkg, opts)
+    if get(opts, :force_rebuild, false)
+        error("Will not force pkg to rebuild dependency \"$(dep.name)\".\n" *
+              "Please make any necessary adjustments manually. (This might just be a version upgrade.)")
+    end
+    @build_steps begin
+        println("Installing dependency $(p.package) via `sudo pkg install -y $(p.package)`:`")
+        `sudo pkg install -y $(p.package)`
+        ()->(ccall(:jl_read_sonames, Void, ()))
     end
 end
 function generate_steps(dep::LibraryDependency,h::NetworkSource,opts)
@@ -565,7 +619,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
             opath = string(lib,ext)
             check_path!(ret,dep,opath)
         end
-        @static if is_linux()
+        @static if is_linux() || (is_bsd() && !is_apple())
             soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
             soname != C_NULL && check_path!(ret,dep,unsafe_string(soname))
         end
@@ -627,7 +681,7 @@ end
 # Default installation method
 if is_apple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif is_linux()
+elseif is_linux() || (is_bsd() && !is_apple())
     defaults = [PackageManager,SystemPaths,BuildProcess]
 elseif is_windows()
     defaults = [Binaries,PackageManager,SystemPaths]
