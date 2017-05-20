@@ -135,10 +135,22 @@ cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], depend
     e.g. whether or not has the correct version. To do so, pass a function that takes 
     (name,handle) as an argument and returns `true` if the library is usable and `false` 
     it not. The `name` argument is either an absolute path or the library name if it is a
-    global system library, while the handle is a handle that may be passed to  `dlsym` to check library symbols or the return value of function. Note however that it 
-    is invalid to store the `handle`. Instead, use the `@load_dependencies` macro (see below).
+    global system library, while the handle is a handle that may be passed to `dlsym` to 
+    check library symbols or the return value of a function. 
     Should the validation return false for a library that was installed by a provider, the 
     provider will be instructed to force a rebuild.
+
+```julia
+
+function validate_cairo_version(name,handle)
+    f = Libdl.dlsym_e(handle, "cairo_version")
+    f == C_NULL && return false
+    v = ccall(f, Int32,())
+    return v > 10800
+end
+...
+cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], validate = validate_cairo_version)
+```
 
 Other keyword arguments will most likely be added as necessary.
 
