@@ -98,9 +98,9 @@ end
 
 if Sys.KERNEL == :FreeBSD
     # The `tar` on FreeBSD can auto-detect the archive format via libarchive.
-    # The supported format can be found in libarchive-formats(5).
+    # The supported formats can be found in libarchive-formats(5).
     # For NetBSD and OpenBSD, libarchive is not available.
-    # For macOS, it does. But the previous unpack function works fine already.
+    # For macOS, it is. But the previous unpack function works fine already.
     function unpack_cmd(file, dir, ext, secondary_ext)
         tar_args = ["--no-same-owner", "--no-same-permissions"]
         return pipeline(

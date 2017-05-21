@@ -141,7 +141,6 @@ cairo = library_dependency("cairo", aliases = ["libcairo-2", "libcairo"], depend
     provider will be instructed to force a rebuild.
 
 ```julia
-
 function validate_cairo_version(name,handle)
     f = Libdl.dlsym_e(handle, "cairo_version")
     f == C_NULL && return false
