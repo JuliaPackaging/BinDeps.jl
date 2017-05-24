@@ -99,13 +99,11 @@ DEBIAN_VERSION_REGEX = r"^
           ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
-const has_sudo = try success(`sudo -V`) catch e false end
-
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
 type AptGet <: PackageManager
     package::AbstractString
 end
-can_use(::Type{AptGet}) = has_apt && has_sudo && is_linux()
+can_use(::Type{AptGet}) = has_apt && is_linux()
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
     vers = Compat.ASCIIString[]
@@ -141,7 +139,7 @@ const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Yum}) = has_yum && has_sudo && is_linux()
+can_use(::Type{Yum}) = has_yum && is_linux()
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
 function available_version(y::Yum)
     uname = readchomp(`uname -m`)
@@ -170,7 +168,7 @@ const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Pacman}) = has_pacman && has_sudo && is_linux()
+can_use(::Type{Pacman}) = has_pacman && is_linux()
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
@@ -202,7 +200,7 @@ const has_zypper = try success(`zypper --version`) catch e false end
 type Zypper <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Zypper}) = has_zypper && has_sudo && is_linux()
+can_use(::Type{Zypper}) = has_zypper && is_linux()
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
@@ -231,7 +229,7 @@ const has_bsdpkg = try success(`pkg -v`) catch e false end
 type BSDPkg <: PackageManager
     package::AbstractString
 end
-can_use(::Type{BSDPkg}) = has_bsdpkg && has_sudo && Sys.KERNEL === :FreeBSD
+can_use(::Type{BSDPkg}) = has_bsdpkg && Sys.KERNEL === :FreeBSD
 function package_available(p::BSDPkg)
     can_use(BSDPkg) || return false
     rgx = Regex(string("^(", p.package, ")(\\s+.+)?\$"))
@@ -366,9 +364,10 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
         error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
+    sudo = get(opts, :sudo, false) ? "sudo" : ""
     @build_steps begin
-        println("Installing dependency $(h.package) via `sudo apt-get install $(h.package)`:")
-        `sudo apt-get install $(h.package)`
+        println("Installing dependency $(h.package) via `$sudo apt-get install $(h.package)`:")
+        `$sudo apt-get install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
@@ -377,10 +376,10 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-
+    sudo = get(opts, :sudo, false) ? "sudo" : ""
     @build_steps begin
-        println("Installing dependency $(h.package) via `sudo yum install $(h.package)`:")
-        `sudo yum install $(h.package)`
+        println("Installing dependency $(h.package) via `$sudo yum install $(h.package)`:")
+        `$sudo yum install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
@@ -389,9 +388,10 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
+    sudo = get(opts, :sudo, false) ? "sudo" : ""
     @build_steps begin
-        println("Installing dependency $(h.package) via `sudo pacman -S --needed $(h.package)`:")
-        `sudo pacman -S --needed $(h.package)`
+        println("Installing dependency $(h.package) via `$sudo pacman -S --needed $(h.package)`:")
+        `$sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
@@ -400,9 +400,10 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
+    sudo = get(opts, :sudo, false) ? "sudo" : ""
     @build_steps begin
-        println("Installing dependency $(h.package) via `sudo zypper install $(h.package)`:")
-        `sudo zypper install $(h.package)`
+        println("Installing dependency $(h.package) via `$sudo zypper install $(h.package)`:")
+        `$sudo zypper install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
 end
@@ -411,9 +412,10 @@ function generate_steps(dep::LibraryDependency, p::BSDPkg, opts)
         error("Will not force pkg to rebuild dependency \"$(dep.name)\".\n" *
               "Please make any necessary adjustments manually. (This might just be a version upgrade.)")
     end
+    sudo = get(opts, :sudo, false) ? "sudo" : ""
     @build_steps begin
-        println("Installing dependency $(p.package) via `sudo pkg install -y $(p.package)`:`")
-        `sudo pkg install -y $(p.package)`
+        println("Installing dependency $(p.package) via `$sudo pkg install -y $(p.package)`:`")
+        `$sudo pkg install -y $(p.package)`
         ()->(ccall(:jl_read_sonames, Void, ()))
     end
 end
