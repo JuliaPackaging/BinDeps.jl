@@ -99,11 +99,13 @@ DEBIAN_VERSION_REGEX = r"^
           ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
+const has_sudo = try success(`sudo -V`) catch e false end
+
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
 type AptGet <: PackageManager
     package::AbstractString
 end
-can_use(::Type{AptGet}) = has_apt && is_linux()
+can_use(::Type{AptGet}) = has_apt && has_sudo && is_linux()
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
     vers = Compat.ASCIIString[]
@@ -139,7 +141,7 @@ const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Yum}) = has_yum && is_linux()
+can_use(::Type{Yum}) = has_yum && has_sudo && is_linux()
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
 function available_version(y::Yum)
     uname = readchomp(`uname -m`)
@@ -168,7 +170,7 @@ const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Pacman}) = has_pacman && is_linux()
+can_use(::Type{Pacman}) = has_pacman && has_sudo && is_linux()
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
@@ -200,7 +202,7 @@ const has_zypper = try success(`zypper --version`) catch e false end
 type Zypper <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Zypper}) = has_zypper && is_linux()
+can_use(::Type{Zypper}) = has_zypper && has_sudo && is_linux()
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
@@ -229,7 +231,7 @@ const has_bsdpkg = try success(`pkg -v`) catch e false end
 type BSDPkg <: PackageManager
     package::AbstractString
 end
-can_use(::Type{BSDPkg}) = has_bsdpkg && Sys.KERNEL === :FreeBSD
+can_use(::Type{BSDPkg}) = has_bsdpkg && has_sudo && Sys.KERNEL === :FreeBSD
 function package_available(p::BSDPkg)
     can_use(BSDPkg) || return false
     rgx = Regex(string("^(", p.package, ")(\\s+.+)?\$"))
