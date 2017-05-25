@@ -99,6 +99,8 @@ DEBIAN_VERSION_REGEX = r"^
           ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
+const has_sudo = try success(`sudo -V`) catch e false end
+
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
 type AptGet <: PackageManager
     package::AbstractString
@@ -356,6 +358,7 @@ function provides{T}(::Type{T},providers::Dict; opts...)
     end
 end
 
+sudoname(c::Cmd) = c == `` ? "" : "sudo "
 
 generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
 generate_steps(h::BuildProcess,dep::LibraryDependency,opts) = h.steps
@@ -364,9 +367,9 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
         error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, false) ? "sudo" : ""
+    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$sudo apt-get install $(h.package)`:")
+        println("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install $(h.package)`:")
         `$sudo apt-get install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
@@ -376,9 +379,9 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, false) ? "sudo" : ""
+    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$sudo yum install $(h.package)`:")
+        println("Installing dependency $(h.package) via `$(sudoname(sudo))yum install $(h.package)`:")
         `$sudo yum install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
@@ -388,9 +391,9 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, false) ? "sudo" : ""
+    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$sudo pacman -S --needed $(h.package)`:")
+        println("Installing dependency $(h.package) via `$(sudoname(sudo))pacman -S --needed $(h.package)`:")
         `$sudo pacman -S --needed $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
@@ -400,9 +403,9 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, false) ? "sudo" : ""
+    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$sudo zypper install $(h.package)`:")
+        println("Installing dependency $(h.package) via `$(sudoname(sudo))zypper install $(h.package)`:")
         `$sudo zypper install $(h.package)`
         ()->(ccall(:jl_read_sonames,Void,()))
     end
@@ -412,9 +415,9 @@ function generate_steps(dep::LibraryDependency, p::BSDPkg, opts)
         error("Will not force pkg to rebuild dependency \"$(dep.name)\".\n" *
               "Please make any necessary adjustments manually. (This might just be a version upgrade.)")
     end
-    sudo = get(opts, :sudo, false) ? "sudo" : ""
+    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(p.package) via `$sudo pkg install -y $(p.package)`:`")
+        println("Installing dependency $(p.package) via `$(sudoname(sudo))pkg install -y $(p.package)`:`")
         `$sudo pkg install -y $(p.package)`
         ()->(ccall(:jl_read_sonames, Void, ()))
     end
