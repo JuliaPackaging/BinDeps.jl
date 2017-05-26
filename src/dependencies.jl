@@ -99,8 +99,6 @@ DEBIAN_VERSION_REGEX = r"^
           ([0-9][a-z0-9.+:~]*))                           # upstream version
 "ix
 
-const has_sudo = try success(`sudo -V`) catch e false end
-
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
 type AptGet <: PackageManager
     package::AbstractString
