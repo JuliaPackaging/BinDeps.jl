@@ -872,7 +872,7 @@ macro install(_libmaps...)
                             """
                             # Macro to load a library
                             macro checked_lib(libname, path)
-                                Base.Libdl.dlopen_e(path) == C_NULL && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run Pkg.build(package), and restart Julia.")
+                                Base.Libdl.dlopen_e(path) == C_NULL && error("Unable to load \\n\\n\$libname (\$path)\\n\\nPlease re-run `Pkg.build(package)` and restart Julia.")
                                 quote const \$(esc(libname)) = \$path end
                             end
                             """)
@@ -1005,7 +1005,7 @@ macro load_dependencies(args...)
         end
         s = Symbol(sym)
         errorcase = Expr(:block)
-        push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running Pkg.build() to install missing dependencies!")))
+        push!(errorcase.args,:(error("Could not load library "*$(dep.name)*". Try running `Pkg.build(package)` to install missing dependencies!")))
         push!(ret.args,quote
             const $(esc(s)) = BinDeps._find_library($dep)
             if isempty($(esc(s)))
