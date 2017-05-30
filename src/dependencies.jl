@@ -564,7 +564,6 @@ function check_path!(ret, dep, opath)
     end
 end
 
-
 function check_system_handle!(ret,dep,handle)
     if handle != C_NULL
         libpath = Libdl.dlpath(handle)
