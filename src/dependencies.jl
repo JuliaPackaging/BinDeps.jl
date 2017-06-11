@@ -365,7 +365,7 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
         error("Will not force apt-get to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
+    sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
         println("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install $(h.package)`:")
         `$sudo apt-get install $(h.package)`
@@ -377,7 +377,7 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
         error("Will not force yum to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
+    sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
         println("Installing dependency $(h.package) via `$(sudoname(sudo))yum install $(h.package)`:")
         `$sudo yum install $(h.package)`
@@ -389,7 +389,7 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
         error("Will not force pacman to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
+    sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
         println("Installing dependency $(h.package) via `$(sudoname(sudo))pacman -S --needed $(h.package)`:")
         `$sudo pacman -S --needed $(h.package)`
@@ -401,7 +401,7 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
         error("Will not force zypper to rebuild dependency \"$(dep.name)\".\n"*
               "Please make any necessary adjustments manually (This might just be a version upgrade)")
     end
-    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
+    sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
         println("Installing dependency $(h.package) via `$(sudoname(sudo))zypper install $(h.package)`:")
         `$sudo zypper install $(h.package)`
@@ -413,7 +413,7 @@ function generate_steps(dep::LibraryDependency, p::BSDPkg, opts)
         error("Will not force pkg to rebuild dependency \"$(dep.name)\".\n" *
               "Please make any necessary adjustments manually. (This might just be a version upgrade.)")
     end
-    sudo = get(opts, :sudo, has_sudo) ? `sudo` : ``
+    sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
         println("Installing dependency $(p.package) via `$(sudoname(sudo))pkg install -y $(p.package)`:`")
         `$sudo pkg install -y $(p.package)`

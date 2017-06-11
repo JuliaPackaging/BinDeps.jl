@@ -558,10 +558,9 @@ include("show.jl")
 
 @Base.deprecate_binding shlib_ext Libdl.dlext
 
-
-# Definitions that should be evaluated upon initialization, not stored in the cache
+const has_sudo = Ref{Bool}(false)
 function __init__()
-    global const has_sudo = try success(`sudo -V`) catch err false end
+    has_sudo[] = try success(`sudo -V`) catch err false end
 end
 
 end
