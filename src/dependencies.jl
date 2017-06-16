@@ -727,7 +727,7 @@ if is_apple()
 elseif is_linux() || (is_bsd() && !is_apple())
     defaults = [PackageManager,SystemPaths,BuildProcess]
 elseif is_windows()
-    defaults = [Binaries,PackageManager,SystemPaths]
+    defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
 else
     defaults = [SystemPaths,BuildProcess]
 end
