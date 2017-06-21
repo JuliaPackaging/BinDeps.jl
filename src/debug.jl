@@ -47,11 +47,11 @@ end
 function debug_context(pkg::AbstractString)
     info("Reading build script...")
     dir = Pkg.dir(pkg)
-    file = joinpath(dir,"deps/build.jl")
-    context = BinDeps.PackageContext(false,dir,pkg,Any[])
+    file = joinpath(dir, "deps", "build.jl")
+    context = BinDeps.PackageContext(false, dir, pkg, Any[])
     m = Module(:__anon__)
-    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
-    eval(m,body)
+    body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
+    eval(m, body)
     context
 end
 
