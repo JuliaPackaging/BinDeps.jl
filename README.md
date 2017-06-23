@@ -157,7 +157,7 @@ Other keyword arguments will most likely be added as necessary.
 
 Alright, now that we have declared all the dependencies that we
 need let's tell BinDeps how to build them. One of the easiest ways
-to do so is to use the system package manger. So suppose we have
+to do so is to use the system package manager. So suppose we have
 defined the following dependencies:
 
 ```julia
