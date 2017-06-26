@@ -50,7 +50,7 @@ function debug_context(pkg::AbstractString)
     file = joinpath(dir, "deps", "build.jl")
     context = BinDeps.PackageContext(false, dir, pkg, Any[])
     m = Module(:__anon__)
-    body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
+    body = Expr(:toplevel, :(ARGS=[$context]), :(include($m, $file)))
     eval(m, body)
     context
 end
