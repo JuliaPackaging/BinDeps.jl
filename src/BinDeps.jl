@@ -192,7 +192,7 @@ type AutotoolsDependency <: BuildStep
     force_rebuild::Bool
     env
     AutotoolsDependency(;srcdir::AbstractString = "", prefix = "", builddir = "", configure_options=AbstractString[], libtarget = AbstractString[], include_dirs=AbstractString[], lib_dirs=AbstractString[], rpath_dirs=AbstractString[], installed_libpath = String[], force_rebuild=false, config_status_dir = "", env = Dict{String,String}()) =
-        new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector)?libtarget:AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
+        new(srcdir,prefix,builddir,configure_options,isa(libtarget,Vector) ? libtarget : AbstractString[libtarget],include_dirs,lib_dirs,rpath_dirs,installed_libpath,config_status_dir,force_rebuild,env)
 end
 
 ### Choices
@@ -407,7 +407,7 @@ if is_unix()
         @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
 end
-is_windows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir)?"-C "*a.dir:"") $(a.targets)`, adjust_env(a.env)), ))
+is_windows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
 lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
 lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -455,7 +455,7 @@ function lower(s::AutotoolsDependency,collection)
             CreateDirectory(s.builddir)
             begin
                 ChangeDirectory(s.builddir)
-                FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
+                FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"), setenv(`$(s.src)/configure $(s.configure_options) --prefix=$(prefix)`,env))
                 FileRule(s.libtarget,MakeTargets(;env=s.env))
                 MakeTargets("install";env=env)
             end
@@ -465,7 +465,7 @@ function lower(s::AutotoolsDependency,collection)
     @static if is_windows()
         @dependent_steps begin
             ChangeDirectory(s.src)
-            FileRule(isempty(s.config_status_dir)?"config.status":joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
+            FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
             FileRule(s.libtarget,MakeTargets())
             MakeTargets("install")
         end

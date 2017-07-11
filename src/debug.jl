@@ -39,7 +39,7 @@ function show(io::IO, deps::LibraryGroup)
     else
         println(io)
         for dep in deps.deps
-            _show_indented(io,dep,4,haskey(all,dep)? all[dep] : nothing)
+            _show_indented(io,dep,4,haskey(all,dep) ? all[dep] : nothing)
         end
     end
 end
