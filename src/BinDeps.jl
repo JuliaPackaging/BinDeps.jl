@@ -11,7 +11,7 @@ export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     MAKE_CMD
 
 function find_library(pkg,libname,files)
-    Base.warn_once("BinDeps.find_library is deprecated, use Base.find_library instead.")
+    Base.warn_once("BinDeps.find_library is deprecated; use Base.find_library instead.")
     dl = C_NULL
     for filename in files
         dl = Libdl.dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
@@ -151,8 +151,8 @@ immutable RemoveDirectory <: BuildStep
 end
 
 type FileDownloader <: BuildStep
-    src::AbstractString     #url
-    dest::AbstractString    #local_file
+    src::AbstractString     # url
+    dest::AbstractString    # local_file
 end
 
 type ChecksumValidator <: BuildStep
@@ -163,8 +163,8 @@ end
 type FileUnpacker <: BuildStep
     src::AbstractString     # archive file
     dest::AbstractString    # directory to unpack into
-    target::AbstractString  #file or directory inside the archive to test
-                    #for existence (or blank to check for a.tgz => a/)
+    target::AbstractString  # file or directory inside the archive to test
+                            # for existence (or blank to check for a.tgz => a/)
 end
 
 
@@ -179,7 +179,7 @@ type MakeTargets <: BuildStep
 end
 
 type AutotoolsDependency <: BuildStep
-    src::AbstractString     #src direcory
+    src::AbstractString     # src direcory
     prefix::AbstractString
     builddir::AbstractString
     configure_options::Vector{AbstractString}
@@ -220,14 +220,14 @@ function run(c::Choices)
             println("- "*string(x.name)*": "*x.description)
         end
         while true
-            print("Plese select desired method: ")
+            print("Plese select the desired method: ")
             method = Symbol(chomp(readline(STDIN)))
             for x in c.choices
                 if(method == x.name)
                     return run(x.step)
                 end
             end
-            warn("Invalid Method")
+            warn("Invalid method")
         end
     end
 end
@@ -341,7 +341,7 @@ FileRule{T<:AbstractString}(files::Vector{T},step) = FileRule(AbstractString[f f
 
 function lower(s::ChangeDirectory,collection)
     if !isempty(collection.steps)
-        error("Change of Directory must be the first instruction")
+        error("Change of directory must be the first instruction")
     end
     collection.cwd = s.dir
 end
@@ -380,7 +380,7 @@ end
 function adjust_env(env)
     ret = similar(env)
     merge!(ret,ENV)
-    merge!(ret,env) #s.env overrides ENV
+    merge!(ret,env) # s.env overrides ENV
     ret
 end
 
@@ -393,7 +393,7 @@ if is_unix()
             if isempty(jobs)
                 jobs = readchomp(`sysctl -n hw.ncpu`)
             end
-            # tons of project written their Makefile in GNU Make only syntax,
+            # Tons of project have written their Makefile in GNU Make only syntax,
             # but the implementation of `make` on FreeBSD system base is `bmake`
             cmd = `gmake -j$jobs`
         end
@@ -485,14 +485,14 @@ function run(s::FileRule)
     end
 end
 function run(s::DirectoryRule)
-    info("Attempting to Create directory $(s.dir)")
+    info("Attempting to create directory $(s.dir)")
     if !isdir(s.dir)
         run(s.step)
         if !isdir(s.dir)
             error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        info("Directory $(s.dir) already created")
+        info("Directory $(s.dir) already exists")
     end
 end
 
@@ -503,7 +503,7 @@ function run(s::PathRule)
             error("Path $(s.path) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        info("Path $(s.path) already created")
+        info("Path $(s.path) already exists")
     end
 end
 
@@ -513,12 +513,12 @@ end
 function run(s::SynchronousStepCollection)
     for x in s.steps
         if !isempty(s.cwd)
-            info("Changing Directory to $(s.cwd)")
+            info("Changing directory to $(s.cwd)")
             cd(s.cwd)
         end
         run(x)
         if !isempty(s.oldcwd)
-            info("Changing Directory to $(s.oldcwd)")
+            info("Changing directory to $(s.oldcwd)")
             cd(s.oldcwd)
         end
     end
