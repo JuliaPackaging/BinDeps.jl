@@ -3,6 +3,7 @@ __precompile__()
 module BinDeps
 
 using Compat
+using Compat.Sys: isapple, isbsd, islinux, isunix, iswindows
 
 export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -40,13 +41,13 @@ macro make_rule(condition,command)
     end
 end
 
-@compat abstract type BuildStep end
+abstract type BuildStep end
 
 downloadcmd = nothing
 function download_cmd(url::AbstractString, filename::AbstractString)
     global downloadcmd
     if downloadcmd === nothing
-        for download_engine in (is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+        for download_engine in (iswindows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
                 :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
             if endswith(string(download_engine), "powershell")
                 checkcmd = `$download_engine -NoProfile -Command ""`
@@ -72,12 +73,12 @@ function download_cmd(url::AbstractString, filename::AbstractString)
     elseif endswith(string(downloadcmd), "powershell")
         return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
     else
-        extraerr = is_windows() ? "check if powershell is on your path or " : ""
+        extraerr = iswindows() ? "check if powershell is on your path or " : ""
         error("No download agent available; $(extraerr)install curl, wget, or fetch.")
     end
 end
 
-if is_unix() && Sys.KERNEL != :FreeBSD
+if isunix() && Sys.KERNEL != :FreeBSD
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
             return (`tar xzf $file --directory=$directory`)
@@ -109,7 +110,7 @@ if Sys.KERNEL == :FreeBSD
     end
 end
 
-if is_windows()
+if iswindows()
     const exe7z = joinpath(JULIA_HOME, "7z.exe")
 
     function unpack_cmd(file,directory,extension,secondary_extension)
@@ -124,7 +125,7 @@ if is_windows()
     end
 end
 
-type SynchronousStepCollection
+mutable struct SynchronousStepCollection
     steps::Vector{Any}
     cwd::AbstractString
     oldcwd::AbstractString
@@ -135,32 +136,32 @@ end
 import Base.push!, Base.run, Base.(|)
 push!(a::SynchronousStepCollection,args...) = push!(a.steps,args...)
 
-type ChangeDirectory <: BuildStep
+mutable struct ChangeDirectory <: BuildStep
     dir::AbstractString
 end
 
-type CreateDirectory <: BuildStep
+mutable struct CreateDirectory <: BuildStep
     dest::AbstractString
     mayexist::Bool
     CreateDirectory(dest, me) = new(dest,me)
     CreateDirectory(dest) = new(dest,true)
 end
 
-immutable RemoveDirectory <: BuildStep
+struct RemoveDirectory <: BuildStep
     dest::AbstractString
 end
 
-type FileDownloader <: BuildStep
+mutable struct FileDownloader <: BuildStep
     src::AbstractString     #url
     dest::AbstractString    #local_file
 end
 
-type ChecksumValidator <: BuildStep
+mutable struct ChecksumValidator <: BuildStep
     sha::AbstractString
     path::AbstractString
 end
 
-type FileUnpacker <: BuildStep
+mutable struct FileUnpacker <: BuildStep
     src::AbstractString     # archive file
     dest::AbstractString    # directory to unpack into
     target::AbstractString  #file or directory inside the archive to test
@@ -168,7 +169,7 @@ type FileUnpacker <: BuildStep
 end
 
 
-type MakeTargets <: BuildStep
+mutable struct MakeTargets <: BuildStep
     dir::AbstractString
     targets::Vector{String}
     env::Dict
@@ -178,7 +179,7 @@ type MakeTargets <: BuildStep
     MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
 end
 
-type AutotoolsDependency <: BuildStep
+mutable struct AutotoolsDependency <: BuildStep
     src::AbstractString     #src direcory
     prefix::AbstractString
     builddir::AbstractString
@@ -197,14 +198,14 @@ end
 
 ### Choices
 
-type Choice
+mutable struct Choice
     name::Symbol
     description::AbstractString
     step::SynchronousStepCollection
     Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
 end
 
-type Choices <: BuildStep
+mutable struct Choices <: BuildStep
     choices::Vector{Choice}
     Choices() = new(Choice[])
     Choices(choices::Vector{Choice}) = new(choices)
@@ -232,7 +233,7 @@ function run(c::Choices)
     end
 end
 
-type CCompile <: BuildStep
+mutable struct CCompile <: BuildStep
     srcFile::AbstractString
     destFile::AbstractString
     options::Vector{String}
@@ -242,12 +243,12 @@ end
 lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
 ##
 
-type DirectoryRule <: BuildStep
+mutable struct DirectoryRule <: BuildStep
     dir::AbstractString
     step
 end
 
-type PathRule <: BuildStep
+mutable struct PathRule <: BuildStep
     path::AbstractString
     step
 end
@@ -329,7 +330,7 @@ end
 (|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
 # Create any of these files
-type FileRule <: BuildStep
+mutable struct FileRule <: BuildStep
     file::Array{AbstractString}
     step
     FileRule(file::AbstractString,step) = FileRule(AbstractString[file],step)
@@ -384,7 +385,7 @@ function adjust_env(env)
     ret
 end
 
-if is_unix()
+if isunix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
 
@@ -407,7 +408,7 @@ if is_unix()
         @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
 end
-is_windows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
+iswindows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
 lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
 lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -416,7 +417,7 @@ lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
 
 function lower(s::AutotoolsDependency,collection)
     prefix = s.prefix
-    if is_windows()
+    if iswindows()
         prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
     end
     cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
@@ -450,7 +451,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if is_unix()
+    @static if isunix()
         @dependent_steps begin
             CreateDirectory(s.builddir)
             begin
@@ -462,7 +463,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if is_windows()
+    @static if iswindows()
         @dependent_steps begin
             ChangeDirectory(s.src)
             FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
@@ -524,7 +525,7 @@ function run(s::SynchronousStepCollection)
     end
 end
 
-const MAKE_CMD = is_bsd() && !is_apple() ? `gmake` : `make`
+const MAKE_CMD = isbsd() && !isapple() ? `gmake` : `make`
 
 function prepare_src(depsdir,url, downloaded_file, directory_name)
     local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)

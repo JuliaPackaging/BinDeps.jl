@@ -1,21 +1,21 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 import Base: show
-const OSNAME = is_windows() ? :Windows : Sys.KERNEL
+const OSNAME = iswindows() ? :Windows : Sys.KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
-@compat abstract type DependencyProvider end
+abstract type DependencyProvider end
 
 # A library helper may be used by `DependencyProvider`s but will by itself not provide the library
-@compat abstract type DependencyHelper end
+abstract type DependencyHelper end
 
-type PackageContext
+mutable struct PackageContext
     do_install::Bool
     dir::AbstractString
     package::AbstractString
     deps::Vector{Any}
 end
 
-type LibraryDependency
+mutable struct LibraryDependency
     name::AbstractString
     context::PackageContext
     providers::Vector{Tuple{DependencyProvider,Dict{Symbol,Any}}}
@@ -24,7 +24,7 @@ type LibraryDependency
     libvalidate::Function
 end
 
-type LibraryGroup
+mutable struct LibraryGroup
     name::AbstractString
     deps::Vector{LibraryDependency}
 end
@@ -91,7 +91,7 @@ export library_dependency, bindir, srcdir, usrdir, libdir
 
 library_dependency(args...; properties...) = error("No context provided. Did you forget `@BinDeps.setup`?")
 
-@compat abstract type PackageManager <: DependencyProvider end
+abstract type PackageManager <: DependencyProvider end
 
 DEBIAN_VERSION_REGEX = r"^
     ([0-9]+\:)?                                           # epoch
@@ -100,10 +100,10 @@ DEBIAN_VERSION_REGEX = r"^
 "ix
 
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
-type AptGet <: PackageManager
+mutable struct AptGet <: PackageManager
     package::AbstractString
 end
-can_use(::Type{AptGet}) = has_apt && is_linux()
+can_use(::Type{AptGet}) = has_apt && islinux()
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
     vers = Compat.ASCIIString[]
@@ -136,10 +136,10 @@ pkg_name(a::AptGet) = a.package
 libdir(p::AptGet,dep) = ["/usr/lib", "/usr/lib64", "/usr/lib32", "/usr/lib/x86_64-linux-gnu", "/usr/lib/i386-linux-gnu"]
 
 const has_yum = try success(`yum --version`) catch e false end
-type Yum <: PackageManager
+mutable struct Yum <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Yum}) = has_yum && is_linux()
+can_use(::Type{Yum}) = has_yum && islinux()
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
 function available_version(y::Yum)
     uname = readchomp(`uname -m`)
@@ -165,10 +165,10 @@ pkg_name(y::Yum) = y.package
 
 # Note that `pacman --version` has an unreliable return value.
 const has_pacman = try success(`pacman -Qq`) catch e false end
-type Pacman <: PackageManager
+mutable struct Pacman <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Pacman}) = has_pacman && is_linux()
+can_use(::Type{Pacman}) = has_pacman && islinux()
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
@@ -197,10 +197,10 @@ libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
 # zypper is a package manager used by openSUSE
 const has_zypper = try success(`zypper --version`) catch e false end
-type Zypper <: PackageManager
+mutable struct Zypper <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Zypper}) = has_zypper && is_linux()
+can_use(::Type{Zypper}) = has_zypper && islinux()
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
@@ -226,7 +226,7 @@ libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
 
 # pkg is the system binary package manager for FreeBSD
 const has_bsdpkg = try success(`pkg -v`) catch e false end
-type BSDPkg <: PackageManager
+mutable struct BSDPkg <: PackageManager
     package::AbstractString
 end
 can_use(::Type{BSDPkg}) = has_bsdpkg && Sys.KERNEL === :FreeBSD
@@ -269,22 +269,22 @@ libdir(p::BSDPkg, dep) = ["/usr/local/lib"]
 # Can use everything else without restriction by default
 can_use(::Type) = true
 
-@compat abstract type Sources <: DependencyHelper end
-@compat abstract type Binaries <: DependencyProvider end
+abstract type Sources <: DependencyHelper end
+abstract type Binaries <: DependencyProvider end
 
 #
 # A dummy provider checked for every library that
 # indicates the library was found somewhere on the
 # system using dlopen.
 #
-immutable SystemPaths <: DependencyProvider; end
+struct SystemPaths <: DependencyProvider; end
 
 show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
 using URIParser
 export URI
 
-type NetworkSource <: Sources
+mutable struct NetworkSource <: Sources
     uri::URI
 end
 
@@ -293,28 +293,28 @@ function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
-type RemoteBinaries <: Binaries
+mutable struct RemoteBinaries <: Binaries
     uri::URI
 end
 
-type CustomPathBinaries <: Binaries
+mutable struct CustomPathBinaries <: Binaries
     path::AbstractString
 end
 
 libdir(p::CustomPathBinaries,dep) = p.path
 
-@compat abstract type BuildProcess <: DependencyProvider end
+abstract type BuildProcess <: DependencyProvider end
 
-type SimpleBuild <: BuildProcess
+mutable struct SimpleBuild <: BuildProcess
     steps
 end
 
-type Autotools <: BuildProcess
+mutable struct Autotools <: BuildProcess
     source
     opts
 end
 
-type GetSources <: BuildStep
+mutable struct GetSources <: BuildStep
     dep::LibraryDependency
 end
 
@@ -362,11 +362,11 @@ const have_sonames = Ref(false)
 const sonames = Dict{String,String}()
 reread_sonames() = (empty!(sonames); have_sonames[] = false; nothing)
 
-if is_windows() || is_apple()
+if iswindows() || isapple()
     function read_sonames()
         have_sonames[] = true
     end
-elseif is_linux()
+elseif islinux()
     let ldconfig_arch = Dict(:i386 => "x32",
                              :i387 => "x32",
                              :i486 => "x32",
@@ -596,9 +596,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
-    if is_unix()
+    if isunix()
         env["PATH"] = bindir(dep)*":"*ENV["PATH"]
-    elseif is_windows()
+    elseif iswindows()
         env["PATH"] = bindir(dep)*";"*ENV["PATH"]
     end
     haskey(opts,:env) && merge!(env,opts[:env])
@@ -643,7 +643,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
 
         # Windows, do you know what `lib` stands for???
-        if is_windows()
+        if iswindows()
             push!(paths,bindir(p,dep))
         end
         (isempty(paths) || all(map(isempty,paths))) && continue
@@ -722,11 +722,11 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-if is_apple()
+if isapple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif is_linux() || (is_bsd() && !is_apple())
+elseif islinux() || (isbsd() && !isapple())
     defaults = [PackageManager,SystemPaths,BuildProcess]
-elseif is_windows()
+elseif iswindows()
     defaults = [Binaries,PackageManager,SystemPaths]
 else
     defaults = [SystemPaths,BuildProcess]
@@ -734,7 +734,7 @@ end
 
 function applicable(dep::LibraryDependency)
     if haskey(dep.properties,:os)
-        if (dep.properties[:os] != OSNAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !is_unix())
+        if (dep.properties[:os] != OSNAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !isunix())
             return false
         end
     elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
@@ -746,7 +746,7 @@ end
 applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !isunix()))
         return false
     end
     if !haskey(opts,:validate)
@@ -759,7 +759,7 @@ function can_provide(p,opts,dep)
 end
 
 function can_provide(p::PackageManager,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !isunix()))
         return false
     end
     if !package_available(p)
