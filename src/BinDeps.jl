@@ -46,7 +46,7 @@ downloadcmd = nothing
 function download_cmd(url::AbstractString, filename::AbstractString)
     global downloadcmd
     if downloadcmd === nothing
-        for download_engine in (is_windows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+        for download_engine in (Compat.Sys.iswindows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
                 :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
             if endswith(string(download_engine), "powershell")
                 checkcmd = `$download_engine -NoProfile -Command ""`
@@ -72,12 +72,12 @@ function download_cmd(url::AbstractString, filename::AbstractString)
     elseif endswith(string(downloadcmd), "powershell")
         return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
     else
-        extraerr = is_windows() ? "check if powershell is on your path or " : ""
+        extraerr = Compat.Sys.iswindows() ? "check if powershell is on your path or " : ""
         error("No download agent available; $(extraerr)install curl, wget, or fetch.")
     end
 end
 
-if is_unix() && Sys.KERNEL != :FreeBSD
+if Compat.Sys.isunix() && Sys.KERNEL != :FreeBSD
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
             return (`tar xzf $file --directory=$directory`)
@@ -109,7 +109,7 @@ if Sys.KERNEL == :FreeBSD
     end
 end
 
-if is_windows()
+if Compat.Sys.iswindows()
     const exe7z = joinpath(JULIA_HOME, "7z.exe")
 
     function unpack_cmd(file,directory,extension,secondary_extension)
@@ -384,7 +384,7 @@ function adjust_env(env)
     ret
 end
 
-if is_unix()
+if Compat.Sys.isunix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
 
@@ -407,7 +407,7 @@ if is_unix()
         @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
 end
-is_windows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
+Compat.Sys.iswindows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
 lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
 lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -416,7 +416,7 @@ lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
 
 function lower(s::AutotoolsDependency,collection)
     prefix = s.prefix
-    if is_windows()
+    if Compat.Sys.iswindows()
         prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
     end
     cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
@@ -450,7 +450,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if is_unix()
+    @static if Compat.Sys.isunix()
         @dependent_steps begin
             CreateDirectory(s.builddir)
             begin
@@ -462,7 +462,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if is_windows()
+    @static if Compat.Sys.iswindows()
         @dependent_steps begin
             ChangeDirectory(s.src)
             FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
@@ -524,7 +524,7 @@ function run(s::SynchronousStepCollection)
     end
 end
 
-const MAKE_CMD = is_bsd() && !is_apple() ? `gmake` : `make`
+const MAKE_CMD = Compat.Sys.isbsd() && !Compat.Sys.isapple() ? `gmake` : `make`
 
 function prepare_src(depsdir,url, downloaded_file, directory_name)
     local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
@@ -548,6 +548,18 @@ autotools_install(depsdir,url, downloaded_file, configure_opts, directory_name, 
 autotools_install(depsdir,url, downloaded_file, configure_opts, directory, libname)=autotools_install(depsdir,url,downloaded_file,configure_opts,directory,directory,libname,libname)
 
 autotools_install(args...) = error("autotools_install has been removed")
+
+function eval_anon_module(context, file)
+    m = Module(:__anon__)
+    if isdefined(Base, Symbol("@__MODULE__"))
+        eval(m, :(ARGS=[$context]))
+        Base.include(m, file)
+    else
+        body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
+        eval(m, body)
+    end
+    return
+end
 
 include("dependencies.jl")
 include("debug.jl")

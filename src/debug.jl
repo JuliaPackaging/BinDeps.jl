@@ -49,16 +49,14 @@ function debug_context(pkg::AbstractString)
     dir = Pkg.dir(pkg)
     file = joinpath(dir, "deps", "build.jl")
     context = BinDeps.PackageContext(false, dir, pkg, Any[])
-    m = Module(:__anon__)
-    body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
-    eval(m, body)
+    eval_anon_module(context, file)
     context
 end
 
 function debug(io,pkg::AbstractString)
     context = debug_context(pkg)
     println(io,"The package declares $(length(context.deps)) dependencies.")
-    
+
     # We need to `eval()` the rest of this function because `debug_context()` will
     # `eval()` in things like `Homebrew.jl`, which contain new methods for things
     # like `can_provide()`, and we cannot deal with those new methods in our

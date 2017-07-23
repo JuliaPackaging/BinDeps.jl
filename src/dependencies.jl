@@ -1,6 +1,6 @@
 # This is the high level interface for building dependencies using the declarative BinDeps Interface
 import Base: show
-const OSNAME = is_windows() ? :Windows : Sys.KERNEL
+const OSNAME = Compat.Sys.iswindows() ? :Windows : Sys.KERNEL
 
 # A dependency provider, if successfully executed will satisfy the dependency
 @compat abstract type DependencyProvider end
@@ -103,7 +103,7 @@ const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e fal
 type AptGet <: PackageManager
     package::AbstractString
 end
-can_use(::Type{AptGet}) = has_apt && is_linux()
+can_use(::Type{AptGet}) = has_apt && Compat.Sys.islinux()
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
     vers = Compat.ASCIIString[]
@@ -139,7 +139,7 @@ const has_yum = try success(`yum --version`) catch e false end
 type Yum <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Yum}) = has_yum && is_linux()
+can_use(::Type{Yum}) = has_yum && Compat.Sys.islinux()
 package_available(y::Yum) = can_use(Yum) && success(`yum list $(y.package)`)
 function available_version(y::Yum)
     uname = readchomp(`uname -m`)
@@ -168,7 +168,7 @@ const has_pacman = try success(`pacman -Qq`) catch e false end
 type Pacman <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Pacman}) = has_pacman && is_linux()
+can_use(::Type{Pacman}) = has_pacman && Compat.Sys.islinux()
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
@@ -200,7 +200,7 @@ const has_zypper = try success(`zypper --version`) catch e false end
 type Zypper <: PackageManager
     package::AbstractString
 end
-can_use(::Type{Zypper}) = has_zypper && is_linux()
+can_use(::Type{Zypper}) = has_zypper && Compat.Sys.islinux()
 package_available(z::Zypper) = can_use(Zypper) && success(`zypper se $(z.package)`)
 function available_version(z::Zypper)
     uname = readchomp(`uname -m`)
@@ -362,11 +362,11 @@ const have_sonames = Ref(false)
 const sonames = Dict{String,String}()
 reread_sonames() = (empty!(sonames); have_sonames[] = false; nothing)
 
-if is_windows() || is_apple()
+if Compat.Sys.iswindows() || Compat.Sys.isapple()
     function read_sonames()
         have_sonames[] = true
     end
-elseif is_linux()
+elseif Compat.Sys.islinux()
     let ldconfig_arch = Dict(:i386 => "x32",
                              :i387 => "x32",
                              :i486 => "x32",
@@ -596,9 +596,9 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
-    if is_unix()
+    if Compat.Sys.isunix()
         env["PATH"] = bindir(dep)*":"*ENV["PATH"]
-    elseif is_windows()
+    elseif Compat.Sys.iswindows()
         env["PATH"] = bindir(dep)*";"*ENV["PATH"]
     end
     haskey(opts,:env) && merge!(env,opts[:env])
@@ -643,7 +643,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
         end
 
         # Windows, do you know what `lib` stands for???
-        if is_windows()
+        if Compat.Sys.iswindows()
             push!(paths,bindir(p,dep))
         end
         (isempty(paths) || all(map(isempty,paths))) && continue
@@ -722,11 +722,11 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-if is_apple()
+if Compat.Sys.isapple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif is_linux() || (is_bsd() && !is_apple())
+elseif Compat.Sys.islinux() || (Compat.Sys.isbsd() && !Compat.Sys.isapple())
     defaults = [PackageManager,SystemPaths,BuildProcess]
-elseif is_windows()
+elseif Compat.Sys.iswindows()
     defaults = [Binaries,PackageManager,SystemPaths]
 else
     defaults = [SystemPaths,BuildProcess]
@@ -734,7 +734,7 @@ end
 
 function applicable(dep::LibraryDependency)
     if haskey(dep.properties,:os)
-        if (dep.properties[:os] != OSNAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !is_unix())
+        if (dep.properties[:os] != OSNAME && dep.properties[:os] != :Unix) || (dep.properties[:os] == :Unix && !Compat.Sys.isunix())
             return false
         end
     elseif haskey(dep.properties,:runtime) && dep.properties[:runtime] == false
@@ -746,7 +746,7 @@ end
 applicable(deps::LibraryGroup) = any([applicable(dep) for dep in deps.deps])
 
 function can_provide(p,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !Compat.Sys.isunix()))
         return false
     end
     if !haskey(opts,:validate)
@@ -759,7 +759,7 @@ function can_provide(p,opts,dep)
 end
 
 function can_provide(p::PackageManager,opts,dep)
-    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !is_unix()))
+    if p === nothing || (haskey(opts,:os) && opts[:os] != OSNAME && (opts[:os] != :Unix || !Compat.Sys.isunix()))
         return false
     end
     if !package_available(p)
@@ -1073,9 +1073,7 @@ macro load_dependencies(args...)
         end
     end
     context = BinDeps.PackageContext(false,dir,pkg,Any[])
-    m = Module(:__anon__)
-    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
-    eval(m,body)
+    eval_anon_module(context, file)
     ret = Expr(:block)
     for dep in context.deps
         if !applicable(dep)
@@ -1143,9 +1141,7 @@ function build(pkg::AbstractString, method; dep::AbstractString="", force=false)
     dir = Pkg.dir(pkg)
     file = joinpath(dir,"deps/build.jl")
     context = BinDeps.PackageContext(false,dir,pkg,Any[])
-    m = Module(:__anon__)
-    body = Expr(:toplevel,:(ARGS=[$context]),:(include($file)))
-    eval(m,body)
+    eval_anon_module(context, file)
     for d in context.deps
         BinDeps.satisfy!(d,[method])
     end
