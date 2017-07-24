@@ -106,7 +106,7 @@ end
 can_use(::Type{AptGet}) = has_apt && Compat.Sys.islinux()
 package_available(p::AptGet) = can_use(AptGet) && !isempty(available_versions(p))
 function available_versions(p::AptGet)
-    vers = Compat.ASCIIString[]
+    vers = String[]
     lookfor_version = false
     for l in eachline(`apt-cache showpkg $(p.package)`)
         if startswith(l,"Version:")
