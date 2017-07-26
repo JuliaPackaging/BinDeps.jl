@@ -124,7 +124,7 @@ if Compat.Sys.iswindows()
     end
 end
 
-type SynchronousStepCollection
+mutable struct SynchronousStepCollection
     steps::Vector{Any}
     cwd::AbstractString
     oldcwd::AbstractString
@@ -135,32 +135,32 @@ end
 import Base.push!, Base.run, Base.(|)
 push!(a::SynchronousStepCollection,args...) = push!(a.steps,args...)
 
-type ChangeDirectory <: BuildStep
+mutable struct ChangeDirectory <: BuildStep
     dir::AbstractString
 end
 
-type CreateDirectory <: BuildStep
+mutable struct CreateDirectory <: BuildStep
     dest::AbstractString
     mayexist::Bool
     CreateDirectory(dest, me) = new(dest,me)
     CreateDirectory(dest) = new(dest,true)
 end
 
-immutable RemoveDirectory <: BuildStep
+struct RemoveDirectory <: BuildStep
     dest::AbstractString
 end
 
-type FileDownloader <: BuildStep
+mutable struct FileDownloader <: BuildStep
     src::AbstractString     # url
     dest::AbstractString    # local_file
 end
 
-type ChecksumValidator <: BuildStep
+mutable struct ChecksumValidator <: BuildStep
     sha::AbstractString
     path::AbstractString
 end
 
-type FileUnpacker <: BuildStep
+mutable struct FileUnpacker <: BuildStep
     src::AbstractString     # archive file
     dest::AbstractString    # directory to unpack into
     target::AbstractString  # file or directory inside the archive to test
@@ -168,7 +168,7 @@ type FileUnpacker <: BuildStep
 end
 
 
-type MakeTargets <: BuildStep
+mutable struct MakeTargets <: BuildStep
     dir::AbstractString
     targets::Vector{String}
     env::Dict
@@ -178,7 +178,7 @@ type MakeTargets <: BuildStep
     MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
 end
 
-type AutotoolsDependency <: BuildStep
+mutable struct AutotoolsDependency <: BuildStep
     src::AbstractString     # src direcory
     prefix::AbstractString
     builddir::AbstractString
@@ -197,14 +197,14 @@ end
 
 ### Choices
 
-type Choice
+mutable struct Choice
     name::Symbol
     description::AbstractString
     step::SynchronousStepCollection
     Choice(name,description,step) = (s=SynchronousStepCollection();lower(step,s);new(name,description,s))
 end
 
-type Choices <: BuildStep
+mutable struct Choices <: BuildStep
     choices::Vector{Choice}
     Choices() = new(Choice[])
     Choices(choices::Vector{Choice}) = new(choices)
@@ -232,7 +232,7 @@ function run(c::Choices)
     end
 end
 
-type CCompile <: BuildStep
+mutable struct CCompile <: BuildStep
     srcFile::AbstractString
     destFile::AbstractString
     options::Vector{String}
@@ -242,12 +242,12 @@ end
 lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
 ##
 
-type DirectoryRule <: BuildStep
+mutable struct DirectoryRule <: BuildStep
     dir::AbstractString
     step
 end
 
-type PathRule <: BuildStep
+mutable struct PathRule <: BuildStep
     path::AbstractString
     step
 end
@@ -329,7 +329,7 @@ end
 (|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
 # Create any of these files
-type FileRule <: BuildStep
+mutable struct FileRule <: BuildStep
     file::Array{AbstractString}
     step
     FileRule(file::AbstractString,step) = FileRule(AbstractString[file],step)
