@@ -4,7 +4,7 @@ module BinDeps
 
 using Compat
 
-export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
+export @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
     ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
     autotools_install, CreateDirectory, MakeTargets, SystemLibInstall,
