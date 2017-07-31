@@ -93,7 +93,7 @@ library_dependency(args...; properties...) = error("No context provided. Did you
 
 @compat abstract type PackageManager <: DependencyProvider end
 
-DEBIAN_VERSION_REGEX = r"^
+const DEBIAN_VERSION_REGEX = r"^
     ([0-9]+\:)?                                           # epoch
     (?:(?:([0-9][a-z0-9.\-+:~]*)-([0-9][a-z0-9.+~]*)) |   # upstream version + debian revision
           ([0-9][a-z0-9.+:~]*))                           # upstream version
