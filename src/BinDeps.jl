@@ -572,7 +572,7 @@ include("show.jl")
 
 const has_sudo = Ref{Bool}(false)
 function __init__()
-    has_sudo[] = try success(`sudo -V`) catch err false end
+    has_sudo[] = get(ENV, "NOSUDO", false) != "true" && try success(`sudo -V`) catch err false end
 end
 
 end
