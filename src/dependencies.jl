@@ -571,7 +571,7 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:installed_libpath] = String[joinpath(libdir(dep),x)*"."*Libdl.dlext for x in stringarray(get(dep.properties,:aliases,String[]))]
     end
     if !haskey(opts,:libtarget) && haskey(dep.properties,:aliases)
-        opts[:libtarget] = String[x*"."*dlext for x in stringarray(dep.properties[:aliases])]
+        opts[:libtarget] = String[x*"."*Libdl.dlext for x in stringarray(dep.properties[:aliases])]
     end
     if !haskey(opts,:include_dirs)
         opts[:include_dirs] = AbstractString[]
