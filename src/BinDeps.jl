@@ -566,13 +566,13 @@ include("debug.jl")
 include("show.jl")
 
 
-# deprecations
-
-@Base.deprecate_binding shlib_ext Libdl.dlext
-
-const has_sudo = Ref{Bool}(false)
+const has_sudo = Ref(false)
 function __init__()
     has_sudo[] = try success(`sudo -V`) catch err false end
 end
+
+# deprecations
+
+@Base.deprecate_binding shlib_ext Libdl.dlext
 
 end
