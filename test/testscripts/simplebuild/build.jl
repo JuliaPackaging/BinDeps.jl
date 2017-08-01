@@ -1,6 +1,6 @@
 #### Test Harness
 
-using Morsel, Compat
+using Morsel
 app = Morsel.app()
 
 route(app, GET, "/liba.tar") do req,sys
@@ -15,7 +15,6 @@ end
 using BinDeps
 
 const testuri = URI("http://localhost:4653/liba.tar")
-const shlib_ext = BinDeps.shlib_ext
 
 @BinDeps.setup
 
@@ -24,6 +23,6 @@ deps = [
 ]
 
 provides(Sources,testuri,liba,SHA="769c43644f239d8825cefc998124060cf9f477f94e8e338f6c3e17839470229d")
-provides(BuildProcess,Autotools(libtarget = "liba.$shlib_ext"),liba)
+provides(BuildProcess,Autotools(libtarget = "liba.$(Libdl.dlext)"),liba)
 
-@BinDeps.install @compat(Dict(:liba => :jl_liba))
+@BinDeps.install Dict(:liba => :jl_liba)
