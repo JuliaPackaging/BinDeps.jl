@@ -725,7 +725,7 @@ end
 if Compat.Sys.isapple()
     defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
 elseif Compat.Sys.islinux() || (Compat.Sys.isbsd() && !Compat.Sys.isapple())
-    defaults = [PackageManager,SystemPaths,Binaries,BuildProcess]
+    defaults = [PackageManager,SystemPaths,BuildProcess]
 elseif Compat.Sys.iswindows()
     defaults = [Binaries,PackageManager,SystemPaths]
 else
