@@ -10,30 +10,10 @@ export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     autotools_install, CreateDirectory, MakeTargets, SystemLibInstall,
     MAKE_CMD
 
-function find_library(pkg,libname,files)
-    Base.warn_once("BinDeps.find_library is deprecated; use Base.find_library instead.")
-    dl = C_NULL
-    for filename in files
-        dl = Libdl.dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
-        if dl != C_NULL
-            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
-            return true
-        end
-
-        dl = Libdl.dlopen_e(filename)
-        if dl != C_NULL
-            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
-            return true
-        end
-    end
-
-    dl = Libdl.dlopen_e(libname)
-    dl != C_NULL ? true : false
-end
 
 macro make_rule(condition,command)
     quote
-        if(!$(esc(condition)))
+        if !$(esc(condition))
             $(esc(command))
             @assert $(esc(condition))
         end
@@ -41,88 +21,6 @@ macro make_rule(condition,command)
 end
 
 @compat abstract type BuildStep end
-
-downloadcmd = nothing
-function download_cmd(url::AbstractString, filename::AbstractString)
-    global downloadcmd
-    if downloadcmd === nothing
-        for download_engine in (Compat.Sys.iswindows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
-                :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
-            if endswith(string(download_engine), "powershell")
-                checkcmd = `$download_engine -NoProfile -Command ""`
-            else
-                checkcmd = `$download_engine --help`
-            end
-            try
-                if success(checkcmd)
-                    downloadcmd = download_engine
-                    break
-                end
-            catch
-                continue # don't bail if one of these fails
-            end
-        end
-    end
-    if downloadcmd == :wget
-        return `$downloadcmd -O $filename $url`
-    elseif downloadcmd == :curl
-        return `$downloadcmd -f -o $filename -L $url`
-    elseif downloadcmd == :fetch
-        return `$downloadcmd -f $filename $url`
-    elseif endswith(string(downloadcmd), "powershell")
-        return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
-    else
-        extraerr = Compat.Sys.iswindows() ? "check if powershell is on your path or " : ""
-        error("No download agent available; $(extraerr)install curl, wget, or fetch.")
-    end
-end
-
-if Compat.Sys.isunix() && Sys.KERNEL != :FreeBSD
-    function unpack_cmd(file,directory,extension,secondary_extension)
-        if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
-            return (`tar xzf $file --directory=$directory`)
-        elseif (extension == ".bz2" && secondary_extension == ".tar") || extension == ".tbz"
-            return (`tar xjf $file --directory=$directory`)
-        elseif extension == ".xz" && secondary_extension == ".tar"
-            return pipeline(`unxz -c $file `, `tar xv --directory=$directory`)
-        elseif extension == ".tar"
-            return (`tar xf $file --directory=$directory`)
-        elseif extension == ".zip"
-            return (`unzip -x $file -d $directory`)
-        elseif extension == ".gz"
-            return pipeline(`mkdir $directory`, `cp $file $directory`, `gzip -d $directory/$file`)
-        end
-        error("I don't know how to unpack $file")
-    end
-end
-
-if Sys.KERNEL == :FreeBSD
-    # The `tar` on FreeBSD can auto-detect the archive format via libarchive.
-    # The supported formats can be found in libarchive-formats(5).
-    # For NetBSD and OpenBSD, libarchive is not available.
-    # For macOS, it is. But the previous unpack function works fine already.
-    function unpack_cmd(file, dir, ext, secondary_ext)
-        tar_args = ["--no-same-owner", "--no-same-permissions"]
-        return pipeline(
-            `/bin/mkdir -p $dir`,
-            `/usr/bin/tar -xf $file -C $dir $tar_args`)
-    end
-end
-
-if Compat.Sys.iswindows()
-    const exe7z = joinpath(JULIA_HOME, "7z.exe")
-
-    function unpack_cmd(file,directory,extension,secondary_extension)
-        if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
-                secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
-            return pipeline(`$exe7z x $file -y -so`, `$exe7z x -si -y -ttar -o$directory`)
-        elseif (extension == ".zip" || extension == ".7z" || extension == ".tar" ||
-                (extension == ".exe" && secondary_extension == ".7z"))
-            return (`$exe7z x $file -y -o$directory`)
-        end
-        error("I don't know how to unpack $file")
-    end
-end
 
 type SynchronousStepCollection
     steps::Vector{Any}
@@ -135,39 +33,79 @@ end
 import Base.push!, Base.run, Base.(|)
 push!(a::SynchronousStepCollection,args...) = push!(a.steps,args...)
 
+"""
+    ChangeDirectory(dir) <: BuildStep
+
+Specifies that the working directory should be changed to `dir`.
+"""
 type ChangeDirectory <: BuildStep
     dir::AbstractString
 end
 
+"""
+    CreateDirectory(dir, mayexist=true) <: BuildStep
+
+Specifies that the directory `dir` should be created. `mayexist` specifies if whether or not the directory may exist.
+"""
 type CreateDirectory <: BuildStep
     dest::AbstractString
     mayexist::Bool
-    CreateDirectory(dest, me) = new(dest,me)
-    CreateDirectory(dest) = new(dest,true)
 end
+CreateDirectory(dest) = CreateDirectory(dest,true)
 
+"""
+    RemoveDirectory(dir) <: BuildStep
+
+Specifies that the directory `dir` should be removed.
+"""
 immutable RemoveDirectory <: BuildStep
     dest::AbstractString
 end
 
+"""
+    FileDownloader(url, dest) <: BuildStep
+
+Specifies that the file from `url` should be downloaded to `dest`.
+"""
 type FileDownloader <: BuildStep
     src::AbstractString     # url
     dest::AbstractString    # local_file
 end
 
+
+"""
+    ChecksumValidator(sha, file) <: BuildStep
+
+Specifies that the file `file` should be checked against the SHA1 sum `sha`.
+"""
 type ChecksumValidator <: BuildStep
     sha::AbstractString
     path::AbstractString
 end
 
+
+"""
+    FileUnpacker(archive, dest[, target]) <: BuildStep
+
+Specifies that the archive file `archive` should be extracted to `dest`.
+
+After extraction, the file `target` is checked to exist: if no `target` is provided, then a file
+of the same name as the archive with the extension removed is checked.
+"""
 type FileUnpacker <: BuildStep
     src::AbstractString     # archive file
     dest::AbstractString    # directory to unpack into
     target::AbstractString  # file or directory inside the archive to test
                             # for existence (or blank to check for a.tgz => a/)
 end
+FileUnpacker(src, dest) = FileUnpacker(src, dest, "")
 
+"""
+    MakeTargets(dir="", targets=[][, env]) <: BuildStep
 
+Invoke GNU Make for targets `targets` in the directory `dir` with the environment variables `env` set.
+
+"""
 type MakeTargets <: BuildStep
     dir::AbstractString
     targets::Vector{String}
@@ -178,6 +116,13 @@ type MakeTargets <: BuildStep
     MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
 end
 
+"""
+    AutotoolsDependency <: BuildStep
+
+Invokes autotools. 
+
+Use of this build step is not recommended: use the [`Autotools`](@ref) provider instead.
+"""
 type AutotoolsDependency <: BuildStep
     src::AbstractString     # src direcory
     prefix::AbstractString
@@ -232,6 +177,11 @@ function run(c::Choices)
     end
 end
 
+"""
+    CCompile(src, dest, options, libs) <: BuildStep
+
+Compile C file `src` to `dest`.
+"""
 type CCompile <: BuildStep
     srcFile::AbstractString
     destFile::AbstractString
@@ -242,11 +192,21 @@ end
 lower(cc::CCompile,c) = lower(FileRule(cc.destFile,`gcc $(cc.options) $(cc.srcFile) $(cc.libs) -o $(cc.destFile)`),c)
 ##
 
+"""
+    DirectoryRule(dir, step) <: BuildStep
+
+If `dir` does not exist invoke `step`, and validate that the directory was created.
+"""
 type DirectoryRule <: BuildStep
     dir::AbstractString
     step
 end
 
+"""
+    PathRule(path, step) <: BuildStep
+
+If `path` does not exist invoke `step` and validate that the directory was created.
+"""
 type PathRule <: BuildStep
     path::AbstractString
     step
@@ -329,6 +289,11 @@ end
 (|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
 # Create any of these files
+"""
+    FileRule(files, step)
+
+If none of the files `files` exist, then invoke `step` and check that one of the files was created.
+"""
 type FileRule <: BuildStep
     file::Array{AbstractString}
     step
@@ -561,6 +526,7 @@ function eval_anon_module(context, file)
     return
 end
 
+include("utils.jl")
 include("dependencies.jl")
 include("debug.jl")
 include("show.jl")
