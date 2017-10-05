@@ -288,11 +288,12 @@ end
 (|)(b::Function,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 (|)(b,a::SynchronousStepCollection) = (c=SynchronousStepCollection(); ((c|b)|a))
 
-# Create any of these files
+
 """
     FileRule(files, step)
 
-If none of the files `files` exist, then invoke `step` and check that one of the files was created.
+If none of the files `files` exist, then invoke `step` and confirm that at least one of
+`files` was created.
 """
 type FileRule <: BuildStep
     file::Array{AbstractString}
