@@ -45,7 +45,8 @@ end
 """
     CreateDirectory(dir, mayexist=true) <: BuildStep
 
-Specifies that the directory `dir` should be created. `mayexist` specifies if whether or not the directory may exist.
+Specifies that the directory `dir` should be created.
+If the directory exists and `mayexist` is `false`, then an error will be thrown.
 """
 type CreateDirectory <: BuildStep
     dest::AbstractString
