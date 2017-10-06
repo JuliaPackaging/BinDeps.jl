@@ -8,14 +8,14 @@ const OSNAME = Compat.Sys.iswindows() ? :Windows : Sys.KERNEL
 # A library helper may be used by `DependencyProvider`s but will by itself not provide the library
 @compat abstract type DependencyHelper end
 
-type PackageContext
+mutable struct PackageContext
     do_install::Bool
     dir::AbstractString
     package::AbstractString
     deps::Vector{Any}
 end
 
-type LibraryDependency
+mutable struct LibraryDependency
     name::AbstractString
     context::PackageContext
     providers::Vector{Tuple{DependencyProvider,Dict{Symbol,Any}}}
@@ -24,7 +24,7 @@ type LibraryDependency
     libvalidate::Function
 end
 
-type LibraryGroup
+mutable struct LibraryGroup
     name::AbstractString
     deps::Vector{LibraryDependency}
 end
@@ -100,7 +100,7 @@ DEBIAN_VERSION_REGEX = r"^
 "ix
 
 const has_apt = try success(`apt-get -v`) && success(`apt-cache -v`) catch e false end
-type AptGet <: PackageManager
+mutable struct AptGet <: PackageManager
     package::AbstractString
 end
 can_use(::Type{AptGet}) = has_apt && Compat.Sys.islinux()
@@ -136,7 +136,7 @@ pkg_name(a::AptGet) = a.package
 libdir(p::AptGet,dep) = ["/usr/lib", "/usr/lib64", "/usr/lib32", "/usr/lib/x86_64-linux-gnu", "/usr/lib/i386-linux-gnu"]
 
 const has_yum = try success(`yum --version`) catch e false end
-type Yum <: PackageManager
+mutable struct Yum <: PackageManager
     package::AbstractString
 end
 can_use(::Type{Yum}) = has_yum && Compat.Sys.islinux()
@@ -165,7 +165,7 @@ pkg_name(y::Yum) = y.package
 
 # Note that `pacman --version` has an unreliable return value.
 const has_pacman = try success(`pacman -Qq`) catch e false end
-type Pacman <: PackageManager
+mutable struct Pacman <: PackageManager
     package::AbstractString
 end
 can_use(::Type{Pacman}) = has_pacman && Compat.Sys.islinux()
@@ -197,7 +197,7 @@ libdir(p::Pacman,dep) = ["/usr/lib", "/usr/lib32"]
 
 # zypper is a package manager used by openSUSE
 const has_zypper = try success(`zypper --version`) catch e false end
-type Zypper <: PackageManager
+mutable struct Zypper <: PackageManager
     package::AbstractString
 end
 can_use(::Type{Zypper}) = has_zypper && Compat.Sys.islinux()
@@ -226,7 +226,7 @@ libdir(z::Zypper,dep) = ["/usr/lib", "/usr/lib32", "/usr/lib64"]
 
 # pkg is the system binary package manager for FreeBSD
 const has_bsdpkg = try success(`pkg -v`) catch e false end
-type BSDPkg <: PackageManager
+mutable struct BSDPkg <: PackageManager
     package::AbstractString
 end
 can_use(::Type{BSDPkg}) = has_bsdpkg && Sys.KERNEL === :FreeBSD
@@ -277,14 +277,14 @@ can_use(::Type) = true
 # indicates the library was found somewhere on the
 # system using dlopen.
 #
-immutable SystemPaths <: DependencyProvider; end
+struct SystemPaths <: DependencyProvider; end
 
 show(io::IO, ::SystemPaths) = print(io,"System Paths")
 
 using URIParser
 export URI
 
-type NetworkSource <: Sources
+mutable struct NetworkSource <: Sources
     uri::URI
 end
 
@@ -293,11 +293,11 @@ function srcdir( dep::LibraryDependency, s::NetworkSource,opts)
     joinpath(srcdir(dep),get(opts,:unpacked_dir,splittarpath(basename(s.uri.path))[1]))
 end
 
-type RemoteBinaries <: Binaries
+mutable struct RemoteBinaries <: Binaries
     uri::URI
 end
 
-type CustomPathBinaries <: Binaries
+mutable struct CustomPathBinaries <: Binaries
     path::AbstractString
 end
 
@@ -305,16 +305,16 @@ libdir(p::CustomPathBinaries,dep) = p.path
 
 @compat abstract type BuildProcess <: DependencyProvider end
 
-type SimpleBuild <: BuildProcess
+mutable struct SimpleBuild <: BuildProcess
     steps
 end
 
-type Autotools <: BuildProcess
+mutable struct Autotools <: BuildProcess
     source
     opts
 end
 
-type GetSources <: BuildStep
+mutable struct GetSources <: BuildStep
     dep::LibraryDependency
 end
 
