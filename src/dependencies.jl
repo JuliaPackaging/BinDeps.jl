@@ -360,7 +360,15 @@ sudoname(c::Cmd) = c == `` ? "" : "sudo "
 
 const have_sonames = Ref(false)
 const sonames = Dict{String,String}()
-reread_sonames() = (empty!(sonames); have_sonames[] = false; nothing)
+function reread_sonames()
+    if VERSION >= v"0.7.0-DEV.1287" # only use this where julia issue #22832 is fixed
+        empty!(sonames)
+        have_sonames[] = false
+        nothing
+    else
+        ccall(:jl_read_sonames, Void, ())
+    end
+end
 
 if Compat.Sys.iswindows() || Compat.Sys.isapple()
     function read_sonames()
@@ -410,10 +418,20 @@ else
     end
 end
 
-lookup_soname(s) = lookup_soname(String(s))
-function lookup_soname(s::String)
-    have_sonames[] || read_sonames()
-    return get(sonames, s, "")
+if VERSION >= v"0.7.0-DEV.1287" # only use this where julia issue #22832 is fixed
+    lookup_soname(s) = lookup_soname(String(s))
+    function lookup_soname(s::String)
+        have_sonames[] || read_sonames()
+        return get(sonames, s, "")
+    end
+else
+    function lookup_soname(lib)
+        if is_linux() || (is_bsd() && !is_apple())
+            soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
+            soname != C_NULL && return unsafe_string(soname)
+        end
+        return ""
+    end
 end
 
 generate_steps(h::DependencyProvider,dep::LibraryDependency) = error("Must also pass provider options")
