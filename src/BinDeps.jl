@@ -8,7 +8,7 @@ export @make_run, @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
     ChangeDirectory, FileDownloader, FileUnpacker, prepare_src,
     autotools_install, CreateDirectory, MakeTargets, SystemLibInstall,
-    MAKE_CMD
+    MAKE_CMD, glibc_version
 
 
 macro make_rule(condition,command)
@@ -525,6 +525,21 @@ function eval_anon_module(context, file)
         eval(m, body)
     end
     return
+end
+
+"""
+    glibc_version()
+
+For Linux-based systems, return the version of glibc in use. For non-glibc Linux and
+other platforms, returns `nothing`.
+"""
+function glibc_version()
+    Compat.Sys.islinux() || return
+    libc = ccall(:jl_dlopen, Ptr{Void}, (Ptr{Void}, UInt32), C_NULL, 0)
+    ptr = Libdl.dlsym_e(libc, :gnu_get_libc_version)
+    ptr == C_NULL && return # non-glibc
+    v = unsafe_string(ccall(ptr, Ptr{UInt8}, ()))
+    ismatch(Base.VERSION_REGEX, v) ? VersionNumber(v) : nothing
 end
 
 include("utils.jl")
