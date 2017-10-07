@@ -574,18 +574,36 @@ function glibc_version()
     ismatch(Base.VERSION_REGEX, v) ? VersionNumber(v) : nothing
 end
 
+const has_sudo = Ref{Bool}(false)
+const build_source = Ref{String}("default")
+
+function __init__()
+    # install from package managers with sudo
+    has_sudo[] = if haskey(ENV, "JULIA_BINDEPS_USE_SUDO")
+        ENV["JULIA_BINDEPS_USE_SUDO"] == "true"
+    else
+        try
+            success(`sudo -V`)
+        catch err
+            false
+        end
+    end
+
+    # preference for building from source
+    build_source[] = let opt = get(ENV, "JULIA_BINDEPS_BUILD_SOURCE", "default")
+        if !in(opt, ["default", "always", "never", "prefer"])
+            error("Unrecognized value '$opt' for environment variable JULIA_BINDEPS_BUILD_SOURCE")
+        end
+        opt
+    end
+end
+
 include("dependencies.jl")
 include("debug.jl")
 include("show.jl")
 
-
 # deprecations
 
 @Base.deprecate_binding shlib_ext Libdl.dlext
-
-const has_sudo = Ref{Bool}(false)
-function __init__()
-    has_sudo[] = try success(`sudo -V`) catch err false end
-end
 
 end

@@ -722,16 +722,31 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-defaults = if Compat.Sys.isbsd()
-    [Binaries, PackageManager, SystemPaths, BuildProcess]
-elseif Compat.Sys.islinux() && glibc_version === nothing # non-glibc
-    [PackageManager, SystemPaths, BuildProcess]
-elseif Compat.Sys.islinux() # glibc
-    [PackageManager, SystemPaths, Binaries, BuildProcess]
-elseif Compat.Sys.iswindows()
-    [Binaries, PackageManager, SystemPaths]
+defaults = if build_source[] == "always"
+    [BuildProcess]
 else
-    [SystemPaths, BuildProcess]
+    d = if Compat.Sys.isapple()
+        [Binaries, PackageManager, SystemPaths, BuildProcess]
+    elseif Compat.Sys.islinux() && glibc_version() === nothing
+        [PackageManager, SystemPaths, BuildProcess]
+    elseif Compat.Sys.islinux() || Compat.Sys.isbsd()
+        [PackageManager, SystemPaths, Binaries, BuildProcess]
+    elseif Compat.Sys.iswindows()
+        [Binaries, PackageManager, SystemPaths]
+    else
+        [SystemPaths, BuildProcess]
+    end
+    if build_source[] in ["never", "prefer"]
+        # Remove BuildProcess
+        for (i, p) in enumerate(d)
+            p == BuildProcess && deleteat!(d, i)
+        end
+    end
+    if build_source[] == "prefer"
+        # Put it back in front
+        unshift!(d, BuildProcess)
+    end
+    d
 end
 
 function applicable(dep::LibraryDependency)

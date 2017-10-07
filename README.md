@@ -380,3 +380,43 @@ The package declares 1 dependencies.
           - BinDeps.Yum package gettext-libs (can't provide)
           - Autotools Build
 ```
+
+# Special settings
+
+At startup, BinDeps checks whether `sudo` is installed on the system, since it's used
+for installing from package managers.
+To disable the check *and* the use of `sudo`, set an environment variable
+`JULIA_BINDEPS_USE_SUDO` equal to `false`.
+Setting this variable to `true` will also disable the check but will assume that `sudo`
+is available.
+
+Some users may prefer to build all dependencies from source rather than using any
+available binaries or installing from package managers.
+To enable this, set an environment variable `JULIA_BINDEPS_BUILD_SOURCE` equal to one
+of the following values:
+
+* `always`: Entirely **disable** installation from any providers other than `BuildProcess`.
+  Note that depending how a particular package is set up, you may not be able to install
+  it at all if it doesn't provide a method for building from source. Use this option with
+  caution.
+
+* `prefer`: Build from source if a `BuildProcess` is available, otherwise use other
+  available providers.
+
+* `never`: Entirely **disable** building from source. This means that packages that only
+  specify `BuildProcess` providers will not be installable. This option is not generally
+  recommended unless no build tools are available or installable on your system. Again,
+  use with caution.
+
+* `default`: Allow building from source with the default priority level. This is the same
+  as not specifying this variable at all.
+
+Note that this applies to `BuildProcess` only; `SimpleBuild` is always enabled.
+
+These settings are checked every time BinDeps starts up, so to have them persist across
+sessions, you can add entries like this to your .juliarc.jl file:
+
+```julia
+ENV["JULIA_BINDEPS_USE_SUDO"] = "false"
+ENV["JULIA_BINDEPS_BUILD_SOURCE"] = "prefer"
+```
