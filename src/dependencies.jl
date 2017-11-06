@@ -722,14 +722,16 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-if Compat.Sys.isapple()
-    defaults = [Binaries,PackageManager,SystemPaths,BuildProcess]
-elseif Compat.Sys.islinux() || (Compat.Sys.isbsd() && !Compat.Sys.isapple())
-    defaults = [PackageManager,SystemPaths,Binaries,BuildProcess]
+defaults = if Compat.Sys.isbsd()
+    [Binaries, PackageManager, SystemPaths, BuildProcess]
+elseif Compat.Sys.islinux() && glibc_version === nothing # non-glibc
+    [PackageManager, SystemPaths, BuildProcess]
+elseif Compat.Sys.islinux() # glibc
+    [PackageManager, SystemPaths, Binaries, BuildProcess]
 elseif Compat.Sys.iswindows()
-    defaults = [Binaries,PackageManager,SystemPaths]
+    [Binaries, PackageManager, SystemPaths]
 else
-    defaults = [SystemPaths,BuildProcess]
+    [SystemPaths, BuildProcess]
 end
 
 function applicable(dep::LibraryDependency)
