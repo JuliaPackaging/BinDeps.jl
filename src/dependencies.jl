@@ -426,7 +426,7 @@ if VERSION >= v"0.7.0-DEV.1287" # only use this where julia issue #22832 is fixe
     end
 else
     function lookup_soname(lib)
-        if is_linux() || (is_bsd() && !is_apple())
+        if Compat.Sys.islinux() || (Compat.Sys.isbsd() && !Compat.Sys.isapple())
             soname = ccall(:jl_lookup_soname, Ptr{UInt8}, (Ptr{UInt8}, Csize_t), lib, sizeof(lib))
             soname != C_NULL && return unsafe_string(soname)
         end
