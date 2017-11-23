@@ -998,7 +998,7 @@ macro install(_libmaps...)
                         depsfile_buffer = IOBuffer()
                         println(depsfile_buffer,
                             """
-                            # This is an auto-generated file; do not edit
+                        # This is an auto-generated file; do not edit and do not check-in in version control
                             """)
                         println(depsfile_buffer, "# Pre-hooks")
                         println(depsfile_buffer, join(pre_hooks, "\n"))
