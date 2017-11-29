@@ -740,9 +740,9 @@ function check_system_handle!(ret,dep,handle)
 end
 
 # Default installation method
-defaults = if Compat.Sys.isbsd()
+defaults = if Compat.Sys.isapple()
     [Binaries, PackageManager, SystemPaths, BuildProcess]
-elseif Compat.Sys.islinux() && glibc_version === nothing # non-glibc
+elseif Compat.Sys.isbsd() || (Compat.Sys.islinux() && glibc_version() === nothing) # non-glibc
     [PackageManager, SystemPaths, BuildProcess]
 elseif Compat.Sys.islinux() # glibc
     [PackageManager, SystemPaths, Binaries, BuildProcess]
