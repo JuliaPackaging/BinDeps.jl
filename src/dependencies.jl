@@ -1131,7 +1131,7 @@ macro load_dependencies(args...)
                     continue
                 end
             elseif isa(arg1,Function)
-                if !f(name)
+                if !arg1(name)
                     continue
                 end
             else
