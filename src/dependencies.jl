@@ -2,6 +2,10 @@
 import Base: show
 const OSNAME = Compat.Sys.iswindows() ? :Windows : Sys.KERNEL
 
+if !isdefined(Base, :pairs)
+    pairs(x) = (a => b for (a, b) in x)
+end
+
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract type DependencyProvider end
 
@@ -44,9 +48,10 @@ bindir(provider, dep) = bindir(dep)
 
 successful_validate(l,p) = true
 
-function _library_dependency(context::PackageContext, name; properties...)
+function _library_dependency(context::PackageContext, name; props...)
     validate = successful_validate
     group = nothing
+    properties = collect(pairs(props))
     for i in 1:length(properties)
         k,v = properties[i]
         if k == :validate
@@ -320,7 +325,7 @@ end
 
 lower(x::GetSources,collection) = push!(collection,generate_steps(x.dep,gethelper(x.dep,Sources)...))
 
-Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}(opts))
+Autotools(;opts...) = Autotools(nothing, Dict{Any,Any}(pairs(opts)))
 
 export AptGet, Yum, Pacman, Zypper, BSDPkg, Sources, Binaries, provides, BuildProcess, Autotools,
        GetSources, SimpleBuild, available_version
@@ -334,8 +339,8 @@ provider(::Type{BuildProcess},p::T; opts...) where {T <: BuildProcess} = provide
 provider(::Type{BuildProcess},steps::Union{BuildStep,SynchronousStepCollection}; opts...) = provider(SimpleBuild,steps; opts...)
 provider(::Type{Autotools},a::Autotools; opts...) = a
 
-provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol,Any}(opts)))
-provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol,Any}(opts)))
+provides(provider::DependencyProvider,dep::LibraryDependency; opts...) = push!(dep.providers,(provider,Dict{Symbol,Any}(pairs(opts))))
+provides(helper::DependencyHelper,dep::LibraryDependency; opts...) = push!(dep.helpers,(helper,Dict{Symbol,Any}(pairs(opts))))
 provides(::Type{T},p,dep::LibraryDependency; opts...) where {T} = provides(provider(T,p; opts...),dep; opts...)
 function provides(::Type{T},packages::AbstractArray,dep::LibraryDependency; opts...) where {T}
     for p in packages
@@ -1126,7 +1131,7 @@ macro load_dependencies(args...)
                     continue
                 end
             elseif isa(arg1,Function)
-                if !f(name)
+                if !arg1(name)
                     continue
                 end
             else
