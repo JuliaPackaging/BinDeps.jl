@@ -22,13 +22,13 @@ function find_library(pkg,libname,files)
     for filename in files
         dl = Libdl.dlopen_e(joinpath(Pkg.dir(),pkg,"deps","usr","lib",filename))
         if dl != C_NULL
-            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
+            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Cvoid}),libname,dl)
             return true
         end
 
         dl = Libdl.dlopen_e(filename)
         if dl != C_NULL
-            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Void}),libname,dl)
+            ccall(:add_library_mapping,Cint,(Ptr{Cchar},Ptr{Cvoid}),libname,dl)
             return true
         end
     end
@@ -138,7 +138,7 @@ mutable struct SynchronousStepCollection
     SynchronousStepCollection() = new(Any[],"","")
 end
 
-import Base.push!, Base.run, Base.(|)
+import Base: push!, run, |
 push!(a::SynchronousStepCollection,args...) = push!(a.steps,args...)
 
 mutable struct ChangeDirectory <: BuildStep
@@ -179,7 +179,7 @@ mutable struct MakeTargets <: BuildStep
     targets::Vector{String}
     env::Dict
     MakeTargets(dir,target;env = Dict{AbstractString,AbstractString}()) = new(dir,target,env)
-    MakeTargets{S<:AbstractString}(target::Vector{S};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
+    MakeTargets(target::Vector{<:AbstractString};env = Dict{AbstractString,AbstractString}()) = new("",target,env)
     MakeTargets(target::String;env = Dict{AbstractString,AbstractString}()) = new("",[target],env)
     MakeTargets(;env = Dict{AbstractString,AbstractString}()) = new("",String[],env)
 end
@@ -349,7 +349,7 @@ function lower(s::ChangeDirectory,collection)
     end
     collection.cwd = s.dir
 end
-lower(s::Void,collection) = nothing
+lower(s::Nothing,collection) = nothing
 lower(s::Function,collection) = push!(collection,s)
 lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,()->(mkpath(s.dest))), )
 lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )
@@ -573,7 +573,7 @@ other platforms, returns `nothing`.
 """
 function glibc_version()
     Compat.Sys.islinux() || return
-    libc = ccall(:jl_dlopen, Ptr{Void}, (Ptr{Void}, UInt32), C_NULL, 0)
+    libc = ccall(:jl_dlopen, Ptr{Cvoid}, (Ptr{Cvoid}, UInt32), C_NULL, 0)
     ptr = Libdl.dlsym_e(libc, :gnu_get_libc_version)
     ptr == C_NULL && return # non-glibc
     v = unsafe_string(ccall(ptr, Ptr{UInt8}, ()))
