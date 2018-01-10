@@ -371,7 +371,7 @@ function reread_sonames()
         have_sonames[] = false
         nothing
     else
-        ccall(:jl_read_sonames, Void, ())
+        ccall(:jl_read_sonames, Cvoid, ())
     end
 end
 
@@ -612,10 +612,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:srcdir] = joinpath(opts[:srcdir],opts[:configure_subdir])
         delete!(opts, :configure_subdir)
     end
-    unshift!(opts[:include_dirs],includedir(dep))
-    unshift!(opts[:lib_dirs],libdir(dep))
-    unshift!(opts[:rpath_dirs],libdir(dep))
-    unshift!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
+    pushfront!(opts[:include_dirs],includedir(dep))
+    pushfront!(opts[:lib_dirs],libdir(dep))
+    pushfront!(opts[:rpath_dirs],libdir(dep))
+    pushfront!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
@@ -649,7 +649,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
 
         # Allow user to override installation path
         if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
-            unshift!(paths,opts[:installed_libpath])
+            pushfront!(paths,opts[:installed_libpath])
         end
 
         ppaths = libdir(p,dep)
@@ -711,7 +711,7 @@ end
 
 function check_path!(ret, dep, opath)
     flags = Libdl.RTLD_LAZY
-    handle = ccall(:jl_dlopen, Ptr{Void}, (Cstring, Cuint), opath, flags)
+    handle = ccall(:jl_dlopen, Ptr{Cvoid}, (Cstring, Cuint), opath, flags)
     try
         check_system_handle!(ret, dep, handle)
     finally
