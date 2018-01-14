@@ -6,6 +6,10 @@ if !isdefined(Base, :pairs)
     pairs(x) = (a => b for (a, b) in x)
 end
 
+if !isdefined(base, :pushfront!)
+    pushfront!(xs, x) = unshift!(xs, x)
+end
+
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract type DependencyProvider end
 
