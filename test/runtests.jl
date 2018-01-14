@@ -9,6 +9,12 @@ using HttpParser
 Pkg.build("GSL")
 using GSL
 
+
+Pkg.build("Gumbo") # Test Autotools code paths
+using Gumbo
+
+
+
 # PR 171
 @test BinDeps.lower(nothing, nothing) === nothing
 
