@@ -6,9 +6,6 @@ if !isdefined(Base, :pairs)
     pairs(x) = (a => b for (a, b) in x)
 end
 
-if !isdefined(base, :pushfront!)
-    pushfront!(xs, x) = unshift!(xs, x)
-end
 
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract type DependencyProvider end
@@ -616,10 +613,10 @@ function generate_steps(dep::LibraryDependency, h::Autotools,  provider_opts)
         opts[:srcdir] = joinpath(opts[:srcdir],opts[:configure_subdir])
         delete!(opts, :configure_subdir)
     end
-    pushfront!(opts[:include_dirs],includedir(dep))
-    pushfront!(opts[:lib_dirs],libdir(dep))
-    pushfront!(opts[:rpath_dirs],libdir(dep))
-    pushfront!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
+    pushfirst!(opts[:include_dirs],includedir(dep))
+    pushfirst!(opts[:lib_dirs],libdir(dep))
+    pushfirst!(opts[:rpath_dirs],libdir(dep))
+    pushfirst!(opts[:pkg_config_dirs],joinpath(libdir(dep),"pkgconfig"))
     env = Dict{String,String}()
     env["PKG_CONFIG_PATH"] = join(opts[:pkg_config_dirs],":")
     delete!(opts,:pkg_config_dirs)
@@ -653,7 +650,7 @@ function _find_library(dep::LibraryDependency; provider = Any)
 
         # Allow user to override installation path
         if haskey(opts,:installed_libpath) && isdir(opts[:installed_libpath])
-            pushfront!(paths,opts[:installed_libpath])
+            pushfirst!(paths,opts[:installed_libpath])
         end
 
         ppaths = libdir(p,dep)
