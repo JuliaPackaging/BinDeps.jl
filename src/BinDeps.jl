@@ -10,6 +10,10 @@ else
     const _HOME = JULIA_HOME
 end
 
+if VERSION >= v"0.7.0-DEV.3382"
+    using Libdl
+end
+
 export @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
     ChangeDirectory, FileUnpacker, prepare_src,

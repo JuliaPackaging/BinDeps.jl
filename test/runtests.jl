@@ -2,6 +2,10 @@ using Compat
 using Compat.Test, Compat.Unicode
 using BinDeps
 
+if VERSION >= v"0.7.0-DEV.3382"
+    using Libdl
+end
+
 Pkg.build("Cairo")  # Tests apt-get code paths
 using Cairo
 Pkg.build("HttpParser")  # Tests build-from-source code paths
