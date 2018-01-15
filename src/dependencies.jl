@@ -240,7 +240,7 @@ function package_available(p::BSDPkg)
     can_use(BSDPkg) || return false
     rgx = Regex(string("^(", p.package, ")(\\s+.+)?\$"))
     for line in eachline(`pkg search -L name $(p.package)`)
-        ismatch(rgx, line) && return true
+        contains(line, rgx) && return true
     end
     return false
 end
@@ -258,9 +258,9 @@ function available_version(p::BSDPkg)
             rawversion = chomp(line[findfirst(c->c==':', line)+2:end])
             # Chop off the port revision and epoch by removing everything after and
             # including the first underscore
-            libversion = replace(rawversion, r"_.+$", "")
+            libversion = replace(rawversion, r"_.+$" => "")
             # This should be a valid version, but it's still possible that it isn't
-            if ismatch(Base.VERSION_REGEX, libversion)
+            if contains(libversion, Base.VERSION_REGEX)
                 return VersionNumber(libversion)
             else
                 error("\"$rawversion\" is not recognized as a version. Please report this to BinDeps.jl.")

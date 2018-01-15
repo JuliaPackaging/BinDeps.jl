@@ -425,7 +425,7 @@ lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
 function lower(s::AutotoolsDependency,collection)
     prefix = s.prefix
     if Compat.Sys.iswindows()
-        prefix = replace(replace(s.prefix,"\\","/"),"C:/","/c/")
+        prefix = replace(replace(s.prefix, "\\" => "/"), "C:/" => "/c/")
     end
     cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
 
@@ -581,7 +581,7 @@ function glibc_version()
     ptr = Libdl.dlsym_e(libc, :gnu_get_libc_version)
     ptr == C_NULL && return # non-glibc
     v = unsafe_string(ccall(ptr, Ptr{UInt8}, ()))
-    ismatch(Base.VERSION_REGEX, v) ? VersionNumber(v) : nothing
+    contains(v, Base.VERSION_REGEX) ? VersionNumber(v) : nothing
 end
 
 include("dependencies.jl")
