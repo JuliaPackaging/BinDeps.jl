@@ -80,7 +80,9 @@ function download_cmd(url::AbstractString, filename::AbstractString)
     elseif downloadcmd == :fetch
         return `$downloadcmd -f $filename $url`
     elseif endswith(string(downloadcmd), "powershell")
-        return `$downloadcmd -NoProfile -Command "(new-object net.webclient).DownloadFile(\"$url\", \"$filename\")"`
+        tls_cmd = "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12"
+        download_cmd = "(new-object net.webclient).DownloadFile(\"$(url)\", \"$(filename)\")"
+        return `$downloadcmd -NoProfile -Command "$(tls_cmd); $(download_cmd)"`
     else
         extraerr = Compat.Sys.iswindows() ? "check if powershell is on your path or " : ""
         error("No download agent available; $(extraerr)install curl, wget, or fetch.")
