@@ -4,15 +4,11 @@ module BinDeps
 
 using Compat
 
-if VERSION >= v"0.7.0-DEV.3073"
-    const _HOME = Sys.BINDIR
-else
-    const _HOME = JULIA_HOME
-end
 
 if VERSION >= v"0.7.0-DEV.3382"
     using Libdl
 end
+
 
 export @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -122,9 +118,9 @@ if Sys.KERNEL == :FreeBSD
 end
 
 if Compat.Sys.iswindows()
-    const exe7z = joinpath(_HOME, "7z.exe")
-
     function unpack_cmd(file,directory,extension,secondary_extension)
+        exe7z = joinpath(Compat.Sys.BINDIR, "7z.exe")
+
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
                 secondary_extension == ".tar") || extension == ".tgz" || extension == ".tbz"
             return pipeline(`$exe7z x $file -y -so`, `$exe7z x -si -y -ttar -o$directory`)
