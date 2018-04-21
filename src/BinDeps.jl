@@ -3,16 +3,8 @@ __precompile__()
 module BinDeps
 
 using Compat
-
-if VERSION >= v"0.7.0-DEV.3073"
-    const _HOME = Sys.BINDIR
-else
-    const _HOME = JULIA_HOME
-end
-
-if VERSION >= v"0.7.0-DEV.3382"
-    using Libdl
-end
+using Compat.Libdl
+using Compat.Pkg
 
 export @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -122,7 +114,7 @@ if Sys.KERNEL == :FreeBSD
 end
 
 if Compat.Sys.iswindows()
-    const exe7z = joinpath(_HOME, "7z.exe")
+    const exe7z = joinpath(Compat.Sys.BINDIR, "7z.exe")
 
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
@@ -226,7 +218,7 @@ push!(c::Choices, args...) = push!(c.choices, args...)
 
 function run(c::Choices)
     println()
-    info("There are multiple options available for installing this dependency:")
+    Compat.@info("There are multiple options available for installing this dependency:")
     while true
         for x in c.choices
             println("- "*string(x.name)*": "*x.description)
@@ -239,7 +231,7 @@ function run(c::Choices)
                     return run(x.step)
                 end
             end
-            warn("Invalid method")
+            Compat.@warn("Invalid method")
         end
     end
 end
@@ -361,7 +353,12 @@ lower(s::CreateDirectory,collection) = @dependent_steps ( DirectoryRule(s.dest,(
 lower(s::RemoveDirectory,collection) = @dependent_steps ( `rm -rf $(s.dest)` )
 lower(s::BuildStep,collection) = push!(collection,s)
 lower(s::Base.AbstractCmd,collection) = push!(collection,s)
-lower(s::FileDownloader,collection) = @dependent_steps ( CreateDirectory(dirname(s.dest),true), ()->info("Downloading file $(s.src)"), FileRule(s.dest,download_cmd(s.src,s.dest)), ()->info("Done downloading file $(s.src)") )
+lower(s::FileDownloader,collection) = @dependent_steps (
+    CreateDirectory(dirname(s.dest), true),
+    ()->Compat.@info("Downloading file $(s.src)"),
+    FileRule(s.dest, download_cmd(s.src, s.dest)),
+    ()->Compat.@info("Done downloading file $(s.src)")
+)
 lower(s::ChecksumValidator,collection) = isempty(s.sha) || @dependent_steps ()->sha_check(s.path, s.sha)
 function splittarpath(path)
     path,extension = splitext(path)
@@ -495,14 +492,14 @@ function run(s::FileRule)
     end
 end
 function run(s::DirectoryRule)
-    info("Attempting to create directory $(s.dir)")
+    Compat.@info("Attempting to create directory $(s.dir)")
     if !isdir(s.dir)
         run(s.step)
         if !isdir(s.dir)
             error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        info("Directory $(s.dir) already exists")
+        Compat.@info("Directory $(s.dir) already exists")
     end
 end
 
@@ -513,7 +510,7 @@ function run(s::PathRule)
             error("Path $(s.path) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        info("Path $(s.path) already exists")
+        Compat.@info("Path $(s.path) already exists")
     end
 end
 
@@ -523,12 +520,12 @@ end
 function run(s::SynchronousStepCollection)
     for x in s.steps
         if !isempty(s.cwd)
-            info("Changing directory to $(s.cwd)")
+            Compat.@info("Changing directory to $(s.cwd)")
             cd(s.cwd)
         end
         run(x)
         if !isempty(s.oldcwd)
-            info("Changing directory to $(s.oldcwd)")
+            Compat.@info("Changing directory to $(s.oldcwd)")
             cd(s.oldcwd)
         end
     end
@@ -583,7 +580,7 @@ function glibc_version()
     ptr = Libdl.dlsym_e(libc, :gnu_get_libc_version)
     ptr == C_NULL && return # non-glibc
     v = unsafe_string(ccall(ptr, Ptr{UInt8}, ()))
-    contains(v, Base.VERSION_REGEX) ? VersionNumber(v) : nothing
+    occursin(Base.VERSION_REGEX, v) ? VersionNumber(v) : nothing
 end
 
 include("dependencies.jl")

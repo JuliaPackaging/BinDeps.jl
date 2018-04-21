@@ -240,7 +240,7 @@ function package_available(p::BSDPkg)
     can_use(BSDPkg) || return false
     rgx = Regex(string("^(", p.package, ")(\\s+.+)?\$"))
     for line in eachline(`pkg search -L name $(p.package)`)
-        contains(line, rgx) && return true
+        occursin(rgx, line) && return true
     end
     return false
 end
@@ -260,7 +260,7 @@ function available_version(p::BSDPkg)
             # including the first underscore
             libversion = replace(rawversion, r"_.+$" => "")
             # This should be a valid version, but it's still possible that it isn't
-            if contains(libversion, Base.VERSION_REGEX)
+            if occursin(Base.VERSION_REGEX, libversion)
                 return VersionNumber(libversion)
             else
                 error("\"$rawversion\" is not recognized as a version. Please report this to BinDeps.jl.")
@@ -399,10 +399,10 @@ elseif Compat.Sys.islinux()
             if m !== nothing
                 desc = m[2]
                 if Sys.WORD_SIZE != 32 && !isempty(arch)
-                    contains(desc, arch) || continue
+                    occursin(arch, desc) || continue
                 end
                 for wrong in arch_wrong
-                    contains(desc, wrong) && continue
+                    occursin(wrong, desc) && continue
                 end
                 sonames[m[1]] = m[3]
             end
@@ -414,7 +414,6 @@ else
     function read_sonames()
         empty!(sonames)
         for line in eachline(`/sbin/ldconfig -r`)
-            VERSION < v"0.6" && (line = chomp(line))
             m = match(r"^\s+\d+:-l([^ ]+)\.[^. ]+ => (.+)$", line)
             if m !== nothing
                 sonames["lib" * m[1]] = m[2]
@@ -1041,7 +1040,7 @@ macro install(_libmaps...)
                         end
                     end
                 end))
-        if !(typeof(libmaps) <: Associative)
+        if !(typeof(libmaps) <: AbstractDict)
             warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
         end
         ret
@@ -1061,8 +1060,8 @@ end
 #       Only load that are declared whose name is listed in the Array
 #       E.g. @load_dependencies "file.jl" [:cairo, :tk]
 #
-#  2. Associative{S<:Union{Symbol,AbstractString},S<:Union{Symbol,AbstractString}}
-#       Only loads libraries whose name matches a key in the Associative collection, but assigns it
+#  2. AbstractDict{S<:Union{Symbol,AbstractString},S<:Union{Symbol,AbstractString}}
+#       Only loads libraries whose name matches a key in the AbstractDict collection, but assigns it
 #       to the name matiching the corresponsing value
 #       E.g. @load_dependencies "file.jl" [:cairo=>:libcairo, :tk=>:libtk]
 #       will assign the result of the lookup for :cairo and :tk to the variables `libcairo` and `libtk`
@@ -1083,14 +1082,14 @@ macro load_dependencies(args...)
         elseif typeof(args[1]) <: AbstractString
             file = args[1]
             dir = dirname(normpath(joinpath(dirname(file),"..")))
-        elseif typeof(args[1]) <: Associative || isa(args[1],Vector)
+        elseif typeof(args[1]) <: AbstractDict || isa(args[1],Vector)
             arg1 = args[1]
         else
             error("Type $(typeof(args[1])) not recognized for argument 1. See usage instructions!")
         end
     elseif length(args) == 2
         file = args[1]
-        arg1 = typeof(args[2]) <: Associative || isa(args[2],Vector) ? args[2] : eval(args[2])
+        arg1 = typeof(args[2]) <: AbstractDict || isa(args[2],Vector) ? args[2] : eval(args[2])
     elseif length(args) != 0
         error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
     end
@@ -1113,7 +1112,7 @@ macro load_dependencies(args...)
         end
         name = sym = dep.name
         if arg1 !== nothing
-            if (typeof(arg1) <: Associative) && all(map(x->(x == Symbol || x <: AbstractString),eltype(arg1)))
+            if (typeof(arg1) <: AbstractDict) && all(map(x->(x == Symbol || x <: AbstractString),eltype(arg1)))
                 found = false
                 for need in keys(arg1)
                     found = (dep.name == string(need))
