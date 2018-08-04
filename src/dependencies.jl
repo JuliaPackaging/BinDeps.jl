@@ -119,6 +119,7 @@ function available_versions(p::AptGet)
             try
                 vs = l[(1+length("Version: ")):end]
                 push!(vers, vs)
+            catch
             end
         elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) !== nothing
             m.captures[2] !== nothing ? push!(vers, m.captures[2]) :
@@ -714,6 +715,7 @@ function check_path!(ret, dep, opath)
     handle = ccall(:jl_dlopen, Ptr{Cvoid}, (Cstring, Cuint), opath, flags)
     try
         check_system_handle!(ret, dep, handle)
+    catch
     finally
         handle != C_NULL && Libdl.dlclose(handle)
     end
