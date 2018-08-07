@@ -1,4 +1,4 @@
 julia 0.6
-HttpParser
+URIParser
 SHA
 Compat 0.62.0
