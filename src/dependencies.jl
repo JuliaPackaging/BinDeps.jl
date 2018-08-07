@@ -1096,10 +1096,10 @@ macro load_dependencies(args...)
         error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
     end
     pkg = ""
-    r = search(dir,Pkg.Dir.path())
-    if r != 0:-1
-        s = search(dir,"/",last(r)+2)
-        if s != 0:-1
+    r = findfirst(Pkg.Dir.path(), dir)
+    if r !== nothing
+        s = findnext("/", dir, last(r)+2)
+        if s !== nothing
             pkg = dir[(last(r)+2):(first(s)-1)]
         else
             pkg = dir[(last(r)+2):end]
