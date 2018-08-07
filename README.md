@@ -1,10 +1,8 @@
 BinDeps.jl
 ==========
 
-[![BinDeps](http://pkg.julialang.org/badges/BinDeps_0.3.svg)](http://pkg.julialang.org/?pkg=BinDeps)
-[![BinDeps](http://pkg.julialang.org/badges/BinDeps_0.4.svg)](http://pkg.julialang.org/?pkg=BinDeps)
-[![BinDeps](http://pkg.julialang.org/badges/BinDeps_0.5.svg)](http://pkg.julialang.org/?pkg=BinDeps)
-[![Travis](https://travis-ci.org/JuliaLang/BinDeps.jl.svg?branch=master)](https://travis-ci.org/JuliaLang/BinDeps.jl)
+[![BinDeps](http://pkg.julialang.org/badges/BinDeps_0.6.svg)](http://pkg.julialang.org/detail/BinDeps)
+[![Travis](https://travis-ci.org/JuliaPackaging/BinDeps.jl.svg?branch=master)](https://travis-ci.org/JuliaPackaging/BinDeps.jl)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/julialang/bindeps.jl?branch=master&svg=true)](https://ci.appveyor.com/project/nalimilan/bindeps-jl/branch/master)
 
 Easily build binary dependencies for Julia packages
