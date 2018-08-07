@@ -119,6 +119,8 @@ function available_versions(p::AptGet)
             try
                 vs = l[(1+length("Version: ")):end]
                 push!(vers, vs)
+            catch e
+                # ignore error
             end
         elseif lookfor_version && (m = match(DEBIAN_VERSION_REGEX, l)) !== nothing
             m.captures[2] !== nothing ? push!(vers, m.captures[2]) :
