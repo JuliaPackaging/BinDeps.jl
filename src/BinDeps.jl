@@ -384,12 +384,7 @@ function lower(s::FileUnpacker,collection)
     end
 end
 
-function adjust_env(env)
-    ret = similar(env)
-    merge!(ret,ENV)
-    merge!(ret,env) # s.env overrides ENV
-    ret
-end
+adjust_env(env) = merge(ENV,env)  # s.env overrides ENV
 
 if Compat.Sys.isunix()
     function lower(a::MakeTargets,collection)
