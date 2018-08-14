@@ -395,21 +395,23 @@ elseif Compat.Sys.islinux()
     global read_sonames
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`/sbin/ldconfig -p`)
-            VERSION < v"0.6" && (line = chomp(line))
-            m = match(r"^\s+([^ ]+)\.so[^ ]* \(([^)]*)\) => (.+)$", line)
-            if m !== nothing
-                desc = m[2]
-                if Sys.WORD_SIZE != 32 && !isempty(arch)
-                    occursin(arch, desc) || continue
+        if ispath("/sbin/ldconfig")
+            for line in eachline(`/sbin/ldconfig -p`)
+                VERSION < v"0.6" && (line = chomp(line))
+                m = match(r"^\s+([^ ]+)\.so[^ ]* \(([^)]*)\) => (.+)$", line)
+                if m !== nothing
+                    desc = m[2]
+                    if Sys.WORD_SIZE != 32 && !isempty(arch)
+                        occursin(arch, desc) || continue
+                    end
+                    for wrong in arch_wrong
+                        occursin(wrong, desc) && continue
+                    end
+                    sonames[m[1]] = m[3]
                 end
-                for wrong in arch_wrong
-                    occursin(wrong, desc) && continue
-                end
-                sonames[m[1]] = m[3]
             end
+            have_sonames[] = true
         end
-        have_sonames[] = true
     end
     end
 else
