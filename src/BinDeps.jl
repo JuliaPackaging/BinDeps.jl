@@ -385,8 +385,7 @@ function lower(s::FileUnpacker,collection)
 end
 
 function adjust_env(env)
-    ret = similar(env)
-    merge!(ret,ENV)
+    ret = copy(ENV)
     merge!(ret,env) # s.env overrides ENV
     ret
 end
