@@ -1,6 +1,7 @@
 using Compat
 using Compat.Test, Compat.Unicode
 using BinDeps
+using Compat.Pkg
 
 if VERSION >= v"0.7.0-DEV.3382"
     using Libdl
@@ -28,7 +29,7 @@ BinDeps.debug("Cairo")
 let gv = glibc_version()
     if Compat.Sys.islinux()
         lddv = lowercase(readchomp(`ldd --version`))
-        if contains(lddv, "gnu") || contains(lddv, "glibc")
+        if occursin("gnu", lddv) || occursin("glibc", lddv)
             @test isa(gv, VersionNumber)
             @test gv >= v"1.0.0"
         else
