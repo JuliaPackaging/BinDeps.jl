@@ -942,7 +942,7 @@ function satisfy!(dep::LibraryDependency, methods = defaults)
                 end
             end
             run(lower(generate_steps(dep,p,opts)))
-            !issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name)")
+            !issatisfied(dep) && error("Provider $method failed to satisfy dependency $(dep.name). Maybe you forgot to declare an alias in a library_dependency?")
             return p
         end
     end
