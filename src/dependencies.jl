@@ -395,7 +395,12 @@ elseif Compat.Sys.islinux()
     global read_sonames
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`/sbin/ldconfig -p`)
+        ldconfig = try
+          eachline(`/sbin/ldconfig -p`)
+        catch
+          eachline(`true`)
+        end
+        for line in ldconfig
             VERSION < v"0.6" && (line = chomp(line))
             m = match(r"^\s+([^ ]+)\.so[^ ]* \(([^)]*)\) => (.+)$", line)
             if m !== nothing
@@ -415,7 +420,12 @@ elseif Compat.Sys.islinux()
 else
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`/sbin/ldconfig -r`)
+        ldconfig = try
+          eachline(`/sbin/ldconfig -r`)
+        catch
+          eachline(`true`)
+        end
+        for line in ldconfig
             m = match(r"^\s+\d+:-l([^ ]+)\.[^. ]+ => (.+)$", line)
             if m !== nothing
                 sonames["lib" * m[1]] = m[2]
