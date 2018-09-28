@@ -450,8 +450,8 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install $(h.package)`:")
-        `$sudo apt-get install $(h.package)`
+        println("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install -y $(h.package)`:")
+        `$sudo apt-get install -y $(h.package)`
         reread_sonames
     end
 end
