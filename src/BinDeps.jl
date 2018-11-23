@@ -554,11 +554,11 @@ autotools_install(args...) = error("autotools_install has been removed")
 function eval_anon_module(context, file)
     m = Module(:__anon__)
     if isdefined(Base, Symbol("@__MODULE__"))
-        eval(m, :(ARGS=[$context]))
+        Core.eval(m, :(ARGS=[$context]))
         Base.include(m, file)
     else
         body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
-        eval(m, body)
+        Core.eval(m, body)
     end
     return
 end
