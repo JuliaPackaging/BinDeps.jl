@@ -108,8 +108,8 @@ if Sys.KERNEL == :FreeBSD
     function unpack_cmd(file, dir, ext, secondary_ext)
         tar_args = ["--no-same-owner", "--no-same-permissions"]
         return pipeline(
-            `/bin/mkdir -p $dir`,
-            `/usr/bin/tar -xf $file -C $dir $tar_args`)
+            `mkdir -p $dir`,
+            `tar -xf $file -C $dir $tar_args`)
     end
 end
 

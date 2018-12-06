@@ -180,7 +180,7 @@ can_use(::Type{Pacman}) = has_pacman && Compat.Sys.islinux()
 package_available(p::Pacman) = can_use(Pacman) && success(`pacman -Si $(p.package)`)
 # Only one version is usually available via pacman, hence no `available_versions`.
 function available_version(p::Pacman)
-    for l in eachline(`/usr/bin/pacman -Si $(p.package)`) # To circumvent alias problems
+    for l in eachline(`pacman -Si $(p.package)`) # To circumvent alias problems
         if startswith(l, "Version")
             # The following isn't perfect, but it's hopefully less brittle than
             # writing a regex for pacman's nonexistent version-string standard.
@@ -395,7 +395,7 @@ elseif Compat.Sys.islinux()
     global read_sonames
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`/sbin/ldconfig -p`)
+        for line in eachline(`ldconfig -p`)
             VERSION < v"0.6" && (line = chomp(line))
             m = match(r"^\s+([^ ]+)\.so[^ ]* \(([^)]*)\) => (.+)$", line)
             if m !== nothing
@@ -415,7 +415,7 @@ elseif Compat.Sys.islinux()
 else
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`/sbin/ldconfig -r`)
+        for line in eachline(`ldconfig -r`)
             m = match(r"^\s+\d+:-l([^ ]+)\.[^. ]+ => (.+)$", line)
             if m !== nothing
                 sonames["lib" * m[1]] = m[2]
