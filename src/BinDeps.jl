@@ -231,7 +231,7 @@ function run(c::Choices)
                     return run(x.step)
                 end
             end
-            Compat.@warn("Invalid method")
+            @warn "Invalid method"
         end
     end
 end
