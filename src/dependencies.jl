@@ -964,7 +964,7 @@ macro install(_libmaps...)
             end
         end)
     else
-        libmaps = eval(_libmaps[1])
+        libmaps = Base.eval(_libmaps[1])
         load_cache = gensym()
         ret = Expr(:block)
         push!(ret.args,
@@ -1080,7 +1080,7 @@ macro load_dependencies(args...)
     file = "../deps/build.jl"
     if length(args) == 1
         if isa(args[1],Expr)
-            arg1 = eval(args[1])
+            arg1 = Base.eval(args[1])
         elseif typeof(args[1]) <: AbstractString
             file = args[1]
             dir = dirname(normpath(joinpath(dirname(file),"..")))
@@ -1091,7 +1091,7 @@ macro load_dependencies(args...)
         end
     elseif length(args) == 2
         file = args[1]
-        arg1 = typeof(args[2]) <: AbstractDict || isa(args[2],Vector) ? args[2] : eval(args[2])
+        arg1 = typeof(args[2]) <: AbstractDict || isa(args[2],Vector) ? args[2] : Base.eval(args[2])
     elseif length(args) != 0
         error("No version of @load_dependencies takes $(length(args)) arguments. See usage instructions!")
     end
