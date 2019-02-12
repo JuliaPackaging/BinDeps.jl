@@ -66,4 +66,4 @@ function debug(io,pkg::AbstractString)
         show($io,dep)
     end
 end
-debug(pkg::AbstractString) = debug(STDOUT,pkg)
+debug(pkg::AbstractString) = debug(stdout,pkg)

@@ -231,7 +231,7 @@ function run(c::Choices)
                     return run(x.step)
                 end
             end
-            Compat.@warn("Invalid method")
+            @warn "Invalid method"
         end
     end
 end
@@ -554,11 +554,11 @@ autotools_install(args...) = error("autotools_install has been removed")
 function eval_anon_module(context, file)
     m = Module(:__anon__)
     if isdefined(Base, Symbol("@__MODULE__"))
-        eval(m, :(ARGS=[$context]))
+        Base.eval(m, :(ARGS=[$context]))
         Base.include(m, file)
     else
         body = Expr(:toplevel, :(ARGS=[$context]), :(include($file)))
-        eval(m, body)
+        Base.eval(m, body)
     end
     return
 end
