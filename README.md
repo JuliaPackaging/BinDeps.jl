@@ -92,7 +92,9 @@ is the name of the library, so the following would be an entirely valid call:
 foo = library_dependency("libfoo")
 ```
 
-However, you'll most likely quickly run into the issue that this library is named differently on different systems, which is
+However, you'll most likely quickly run into the issue that this library is named differently on different systems.
+(If this happens, you will receive an error such as `Provider Binaries failed to satisfy dependency libfoo`.)
+This is
 why BinDeps provides the handy `aliases` keyword argument. So suppose our library is sometimes known as `libfoo.so`, but
 other times as `libfoo-1.so` or `libfoo-1.0.0.dylib` or even `libbar.dll` on windows, because the authors of the library
 decided to punish windows users. In either case, we can easily declare all these in our library dependency:
