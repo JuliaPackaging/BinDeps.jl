@@ -1,5 +1,5 @@
 using Compat
-using Compat.Test, Compat.Unicode
+using Compat.Test, Compat.Unicode, Compat.Pkg
 using BinDeps
 
 if VERSION >= v"0.7.0-DEV.3382"
@@ -8,8 +8,6 @@ end
 
 Pkg.build("Cairo")  # Tests apt-get code paths
 using Cairo
-Pkg.build("HttpParser")  # Tests build-from-source code paths
-using HttpParser
 Pkg.build("GSL")
 using GSL
 
@@ -28,7 +26,7 @@ BinDeps.debug("Cairo")
 let gv = glibc_version()
     if Compat.Sys.islinux()
         lddv = lowercase(readchomp(`ldd --version`))
-        if contains(lddv, "gnu") || contains(lddv, "glibc")
+        if occursin("gnu", lddv) || occursin("glibc", lddv)
             @test isa(gv, VersionNumber)
             @test gv >= v"1.0.0"
         else
