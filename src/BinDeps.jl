@@ -589,7 +589,23 @@ include("show.jl")
 
 const has_sudo = Ref{Bool}(false)
 function __init__()
-    has_sudo[] = try success(`sudo -V`) catch err false end
+    has_sudo[] = try
+        success(`command -v sudo`)
+    catch err
+        # Check that if we got an error, it's because we don't have `command`. In
+        # that case, we'll fall back to trying to run `sudo`. Otherwise, who knows
+        # what happened... we'll just rethrow.
+        if isa(err, ErrorException) && contains(err.msg, "ENOENT")
+            try
+                success(`sudo -V`)
+            catch serr
+                false
+            end
+        else
+            rethrow(err)
+        end
+        false
+    end
 end
 
 end
