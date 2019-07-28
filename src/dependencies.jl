@@ -6,6 +6,12 @@ if !isdefined(Base, :pairs)
     pairs(x) = (a => b for (a, b) in x)
 end
 
+# compatability fix
+if isdefined(Base, :warn)
+    macro warn(s)
+        warn(s)
+    end
+end
 
 # A dependency provider, if successfully executed will satisfy the dependency
 abstract type DependencyProvider end
