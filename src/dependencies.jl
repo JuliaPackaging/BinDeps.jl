@@ -136,7 +136,7 @@ end
 function available_version(p::AptGet)
     vers = available_versions(p)
     isempty(vers) && error("apt-cache did not return version information. This shouldn't happen. Please file a bug!")
-    length(vers) > 1 && warn("Multiple versions of $(p.package) are available.  Use BinDeps.available_versions to get all versions.")
+    length(vers) > 1 && @warn("Multiple versions of $(p.package) are available.  Use BinDeps.available_versions to get all versions.")
     return vers[end]
 end
 pkg_name(a::AptGet) = a.package
@@ -731,7 +731,7 @@ function check_system_handle!(ret,dep,handle)
                     return
                 end
             catch
-                warn("""
+                @warn("""
                     Found a library that does not exist.
                     This may happen if the library has an active open handle.
                     Please quit julia and try again.
@@ -1043,7 +1043,7 @@ macro install(_libmaps...)
                     end
                 end))
         if !(typeof(libmaps) <: AbstractDict)
-            warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
+            @warn("Incorrect mapping in BinDeps.@install call. No dependencies will be cached.")
         end
         ret
     end
