@@ -114,7 +114,12 @@ if Sys.KERNEL == :FreeBSD
 end
 
 if Compat.Sys.iswindows()
-    const exe7z = joinpath(Compat.Sys.BINDIR, "7z.exe")
+    if isdefined(Base, :LIBEXECDIR)
+        const exe7z = joinpath(Sys.BINDIR, Base.LIBEXECDIR, "7z.exe")
+    else
+        const exe7z = joinpath(Sys.BINDIR, "7z.exe")
+    end
+
 
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
