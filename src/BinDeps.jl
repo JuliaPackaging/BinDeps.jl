@@ -2,9 +2,8 @@ __precompile__()
 
 module BinDeps
 
-using Compat
-using Compat.Libdl
-using Compat.Pkg
+using Libdl
+using Pkg
 
 export @build_steps, find_library, download_cmd, unpack_cmd,
     Choice, Choices, CCompile, FileDownloader, FileRule,
@@ -48,7 +47,7 @@ downloadcmd = nothing
 function download_cmd(url::AbstractString, filename::AbstractString)
     global downloadcmd
     if downloadcmd === nothing
-        for download_engine in (Compat.Sys.iswindows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
+        for download_engine in (Sys.iswindows() ? ("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell",
                 :powershell, :curl, :wget, :fetch) : (:curl, :wget, :fetch))
             if endswith(string(download_engine), "powershell")
                 checkcmd = `$download_engine -NoProfile -Command ""`
@@ -76,12 +75,12 @@ function download_cmd(url::AbstractString, filename::AbstractString)
         download_cmd = "(new-object net.webclient).DownloadFile(\"$(url)\", \"$(filename)\")"
         return `$downloadcmd -NoProfile -Command "$(tls_cmd); $(download_cmd)"`
     else
-        extraerr = Compat.Sys.iswindows() ? "check if powershell is on your path or " : ""
+        extraerr = Sys.iswindows() ? "check if powershell is on your path or " : ""
         error("No download agent available; $(extraerr)install curl, wget, or fetch.")
     end
 end
 
-if Compat.Sys.isunix() && Sys.KERNEL != :FreeBSD
+if Sys.isunix() && Sys.KERNEL != :FreeBSD
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".gz" || extension == ".Z") && secondary_extension == ".tar") || extension == ".tgz"
             return (`tar xzf $file --directory=$directory`)
@@ -113,13 +112,12 @@ if Sys.KERNEL == :FreeBSD
     end
 end
 
-if Compat.Sys.iswindows()
+if Sys.iswindows()
     if isdefined(Base, :LIBEXECDIR)
         const exe7z = joinpath(Sys.BINDIR, Base.LIBEXECDIR, "7z.exe")
     else
         const exe7z = joinpath(Sys.BINDIR, "7z.exe")
     end
-
 
     function unpack_cmd(file,directory,extension,secondary_extension)
         if ((extension == ".Z" || extension == ".gz" || extension == ".xz" || extension == ".bz2") &&
@@ -223,7 +221,7 @@ push!(c::Choices, args...) = push!(c.choices, args...)
 
 function run(c::Choices)
     println()
-    Compat.@info("There are multiple options available for installing this dependency:")
+    @info("There are multiple options available for installing this dependency:")
     while true
         for x in c.choices
             println("- "*string(x.name)*": "*x.description)
@@ -236,7 +234,7 @@ function run(c::Choices)
                     return run(x.step)
                 end
             end
-            Compat.@warn("Invalid method")
+            @warn("Invalid method")
         end
     end
 end
@@ -360,9 +358,9 @@ lower(s::BuildStep,collection) = push!(collection,s)
 lower(s::Base.AbstractCmd,collection) = push!(collection,s)
 lower(s::FileDownloader,collection) = @dependent_steps (
     CreateDirectory(dirname(s.dest), true),
-    ()->Compat.@info("Downloading file $(s.src)"),
+    ()->@info("Downloading file $(s.src)"),
     FileRule(s.dest, download_cmd(s.src, s.dest)),
-    ()->Compat.@info("Done downloading file $(s.src)")
+    ()->@info("Done downloading file $(s.src)")
 )
 lower(s::ChecksumValidator,collection) = isempty(s.sha) || @dependent_steps ()->sha_check(s.path, s.sha)
 function splittarpath(path)
@@ -391,7 +389,7 @@ end
 
 adjust_env(env) = merge(ENV,env)  # s.env overrides ENV
 
-if Compat.Sys.isunix()
+if Sys.isunix()
     function lower(a::MakeTargets,collection)
         cmd = `make -j8`
 
@@ -414,7 +412,7 @@ if Compat.Sys.isunix()
         @dependent_steps ( setenv(cmd, adjust_env(a.env)), )
     end
 end
-Compat.Sys.iswindows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
+Sys.iswindows() && (lower(a::MakeTargets,collection) = @dependent_steps ( setenv(`make $(!isempty(a.dir) ? "-C "*a.dir : "") $(a.targets)`, adjust_env(a.env)), ))
 lower(s::SynchronousStepCollection,collection) = (collection|=s)
 
 lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
@@ -423,7 +421,7 @@ lower(s) = (c=SynchronousStepCollection();lower(s,c);c)
 
 function lower(s::AutotoolsDependency,collection)
     prefix = s.prefix
-    if Compat.Sys.iswindows()
+    if Sys.iswindows()
         prefix = replace(replace(s.prefix, "\\" => "/"), "C:/" => "/c/")
     end
     cmdstring = "pwd && ./configure --prefix=$(prefix) "*join(s.configure_options," ")
@@ -457,7 +455,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if Compat.Sys.isunix()
+    @static if Sys.isunix()
         @dependent_steps begin
             CreateDirectory(s.builddir)
             begin
@@ -469,7 +467,7 @@ function lower(s::AutotoolsDependency,collection)
         end
     end
 
-    @static if Compat.Sys.iswindows()
+    @static if Sys.iswindows()
         @dependent_steps begin
             ChangeDirectory(s.src)
             FileRule(isempty(s.config_status_dir) ? "config.status" : joinpath(s.config_status_dir,"config.status"),setenv(`sh -c $cmdstring`,env))
@@ -492,14 +490,14 @@ function run(s::FileRule)
     end
 end
 function run(s::DirectoryRule)
-    Compat.@info("Attempting to create directory $(s.dir)")
+    @info("Attempting to create directory $(s.dir)")
     if !isdir(s.dir)
         run(s.step)
         if !isdir(s.dir)
             error("Directory $(s.dir) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        Compat.@info("Directory $(s.dir) already exists")
+        @info("Directory $(s.dir) already exists")
     end
 end
 
@@ -510,7 +508,7 @@ function run(s::PathRule)
             error("Path $(s.path) was not created successfully (Tried to run $(s.step) )")
         end
     else
-        Compat.@info("Path $(s.path) already exists")
+        @info("Path $(s.path) already exists")
     end
 end
 
@@ -520,18 +518,18 @@ end
 function run(s::SynchronousStepCollection)
     for x in s.steps
         if !isempty(s.cwd)
-            Compat.@info("Changing directory to $(s.cwd)")
+            @info("Changing directory to $(s.cwd)")
             cd(s.cwd)
         end
         run(x)
         if !isempty(s.oldcwd)
-            Compat.@info("Changing directory to $(s.oldcwd)")
+            @info("Changing directory to $(s.oldcwd)")
             cd(s.oldcwd)
         end
     end
 end
 
-const MAKE_CMD = Compat.Sys.isbsd() && !Compat.Sys.isapple() ? `gmake` : `make`
+const MAKE_CMD = Sys.isbsd() && !Sys.isapple() ? `gmake` : `make`
 
 function prepare_src(depsdir,url, downloaded_file, directory_name)
     local_file = joinpath(joinpath(depsdir,"downloads"),downloaded_file)
@@ -575,7 +573,7 @@ For Linux-based systems, return the version of glibc in use. For non-glibc Linux
 other platforms, returns `nothing`.
 """
 function glibc_version()
-    Compat.Sys.islinux() || return
+    Sys.islinux() || return
     libc = ccall(:jl_dlopen, Ptr{Cvoid}, (Ptr{Cvoid}, UInt32), C_NULL, 0)
     ptr = Libdl.dlsym_e(libc, :gnu_get_libc_version)
     ptr == C_NULL && return # non-glibc

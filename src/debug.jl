@@ -45,7 +45,7 @@ function show(io::IO, deps::LibraryGroup)
 end
 
 function debug_context(pkg::AbstractString)
-    Compat.@info("Reading build script...")
+    @info("Reading build script...")
     dir = Pkg.dir(pkg)
     file = joinpath(dir, "deps", "build.jl")
     context = BinDeps.PackageContext(false, dir, pkg, Any[])

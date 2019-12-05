@@ -1,5 +1,4 @@
-using Compat
-using Compat.Test, Compat.Unicode, Compat.Pkg
+using Test, Unicode, Pkg
 using BinDeps
 
 if VERSION >= v"0.7.0-DEV.3382"
@@ -24,7 +23,7 @@ using Gumbo
 BinDeps.debug("Cairo")
 
 let gv = glibc_version()
-    if Compat.Sys.islinux()
+    if Sys.islinux()
         lddv = lowercase(readchomp(`ldd --version`))
         if occursin("gnu", lddv) || occursin("glibc", lddv)
             @test isa(gv, VersionNumber)
