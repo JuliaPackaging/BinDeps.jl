@@ -8,8 +8,9 @@ end
 
 Pkg.build("Cairo")  # Tests apt-get code paths
 using Cairo
-Pkg.build("HttpParser")  # Tests build-from-source code paths
-using HttpParser
+# Disabled: HttpParser isn't available in Julia 1.0
+#Pkg.build("HttpParser")  # Tests build-from-source code paths
+#using HttpParser
 Pkg.build("GSL")
 using GSL
 
