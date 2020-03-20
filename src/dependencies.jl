@@ -383,6 +383,12 @@ if Sys.iswindows() || Sys.isapple()
         have_sonames[] = true
     end
 elseif Sys.islinux()
+    # Some Linux distros do not expose executables from /sbin and /usr/sbin via PATH.
+    # If that's the case, we add these paths here explicitly
+    if isnothing(Sys.which("ldconfig"))
+        ENV["PATH"] *= ":/usr/local/sbin:/usr/sbin:/sbin"
+    end
+
     let ldconfig_arch = Dict(:i386 => "x32",
                              :i387 => "x32",
                              :i486 => "x32",
