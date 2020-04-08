@@ -396,15 +396,11 @@ elseif Sys.islinux()
     function read_sonames()
         empty!(sonames)
 
-        # Some Linux distros do not expose executables from /sbin and /usr/sbin via PATH.
-        # If that's the case, we add these paths here explicitly
-        if isnothing(Sys.which("ldconfig"))
-            ldcfg_path = ENV["PATH"] * ":/usr/local/sbin:/usr/sbin:/sbin"
-            lines_ldconfig = withenv("PATH" => ldcfg_path) do
-                eachline(`ldconfig -p`)
-            end
-        else
-            lines_ldconfig = eachline(`ldconfig -p`)
+        # Some Linux distros do not expose executables from /sbin and /usr/sbin via PATH,
+        # so we append these here explicitly
+        ldconfig_path = ENV["PATH"] * ":/usr/local/sbin:/usr/sbin:/sbin"
+        lines_ldconfig = withenv("PATH" => ldconfig_path) do
+            eachline(`ldconfig -p`)
         end
         for line in lines_ldconfig
             VERSION < v"0.6" && (line = chomp(line))
