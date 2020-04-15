@@ -395,7 +395,14 @@ elseif Sys.islinux()
     global read_sonames
     function read_sonames()
         empty!(sonames)
-        for line in eachline(`ldconfig -p`)
+
+        # Some Linux distros do not expose executables from /sbin and /usr/sbin via PATH,
+        # so we append these here explicitly
+        ldconfig_path = ENV["PATH"] * ":/usr/local/sbin:/usr/sbin:/sbin"
+        lines_ldconfig = withenv("PATH" => ldconfig_path) do
+            eachline(`ldconfig -p`)
+        end
+        for line in lines_ldconfig
             VERSION < v"0.6" && (line = chomp(line))
             m = match(r"^\s+([^ ]+)\.so[^ ]* \(([^)]*)\) => (.+)$", line)
             if m !== nothing
