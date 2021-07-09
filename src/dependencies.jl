@@ -457,8 +457,8 @@ function generate_steps(dep::LibraryDependency,h::AptGet,opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install $(h.package)`:")
-        `$sudo apt-get install $(h.package)`
+        info("Installing dependency $(h.package) via `$(sudoname(sudo))apt-get install -y $(h.package)`:")
+        `$sudo apt-get install -y $(h.package)`
         reread_sonames
     end
 end
@@ -469,8 +469,8 @@ function generate_steps(dep::LibraryDependency,h::Yum,opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$(sudoname(sudo))yum install $(h.package)`:")
-        `$sudo yum install $(h.package)`
+        info("Installing dependency $(h.package) via `$(sudoname(sudo))yum install -y $(h.package)`:")
+        `$sudo yum install -y $(h.package)`
         reread_sonames
     end
 end
@@ -481,8 +481,8 @@ function generate_steps(dep::LibraryDependency,h::Pacman,opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$(sudoname(sudo))pacman -S --needed $(h.package)`:")
-        `$sudo pacman -S --needed $(h.package)`
+        info("Installing dependency $(h.package) via `$(sudoname(sudo))pacman -S --needed $(h.package) --noconfirm`:")
+        `$sudo pacman -S --needed $(h.package) --noconfirm`
         reread_sonames
     end
 end
@@ -493,8 +493,8 @@ function generate_steps(dep::LibraryDependency,h::Zypper,opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(h.package) via `$(sudoname(sudo))zypper install $(h.package)`:")
-        `$sudo zypper install $(h.package)`
+        info("Installing dependency $(h.package) via `$(sudoname(sudo))zypper install -n $(h.package)`:")
+        `$sudo zypper install -n $(h.package)`
         reread_sonames
     end
 end
@@ -505,7 +505,7 @@ function generate_steps(dep::LibraryDependency, p::BSDPkg, opts)
     end
     sudo = get(opts, :sudo, has_sudo[]) ? `sudo` : ``
     @build_steps begin
-        println("Installing dependency $(p.package) via `$(sudoname(sudo))pkg install -y $(p.package)`:`")
+        info("Installing dependency $(p.package) via `$(sudoname(sudo))pkg install -y $(p.package)`:`")
         `$sudo pkg install -y $(p.package)`
         reread_sonames
     end
